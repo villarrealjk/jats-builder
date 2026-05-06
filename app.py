@@ -939,17 +939,11 @@ def create_app():
         flash("Permisos del usuario actualizados.")
         return redirect(url_for("admin_users"))
     
-    
-    return app
-
-if __name__ == "__main__":
-    app = create_app()
     with app.app_context():
         db.create_all()
         if os.getenv("INIT_ADMIN") == "true":
             with app.app_context():
                 from models import User
-
                 username = os.getenv("INIT_ADMIN_USER")
                 email = os.getenv("INIT_ADMIN_EMAIL")
                 password = os.getenv("INIT_ADMIN_PASSWORD")
@@ -969,4 +963,9 @@ if __name__ == "__main__":
 
                         print("✅ Superusuario creado automáticamente")
         seed()
+
+    return app
+
+if __name__ == "__main__":
+    app = create_app()
     app.run(debug=os.getenv("FLASK_DEBUG", "0") == "1")
