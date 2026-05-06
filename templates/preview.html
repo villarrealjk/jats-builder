@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import page_header %}
+{% block title %}Vista previa · {{ article.titles[0].text if article.titles else 'Artículo' }}{% endblock %}
+
+{% block content %}
+  {{ page_header('Vista previa del artículo', url_for('article_edit', article_id=article.id)) }}
+
+  <!-- Cabecera del artículo (multilengua) -->
+  <section class="bg-white rounded-xl shadow-sm p-5 mb-6">
+    <!-- Barra de idioma -->
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      <div class="text-sm text-gray-600 mr-2">Idioma:</div>
+      <div id="lang-switch" class="flex flex-wrap gap-2"></div>
+    </div>
+
+    <!-- Título activo -->
+    <h1 id="title-active" class="text-2xl font-bold">
+      {% if article.titles and article.titles[0].text %}
+        {{ article.titles[0].text }}
+      {% else %}
+        (Sin título)
+      {% endif %}
+    </h1>
+
+    <!-- Autores -->
+    <div class="mt-1 text-sm text-gray-600">
+      {% if article.authors %}
+        {% for a in article.authors %}
+          <span class="mr-2">{{ a.given_names }} {{ a.surname }}</span>{% if not loop.last %}·{% endif %}
+        {% endfor %}
+      {% else %}
+        <span class="italic text-gray-400">Sin autores</span>
+      {% endif %}
+    </div>
+
+    <!-- Metadatos -->
+    <div class="mt-2 text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1">
+      {% if article.doi %}<span>DOI: {{ article.doi }}</span>{% endif %}
+      {% if article.journal %}
+        <span>Revista: {{ article.journal.name }}</span>
+        {% if article.fpage %}<span>Págs: {{ article.fpage }}–{{ article.lpage or '?' }}</span>{% endif %}
+        {% if article.elocation_id %}<span>Elocation: {{ article.elocation_id }}</span>{% endif %}
+      {% endif %}
+      <span>Idioma base: {{ article.language or (article.journal and article.journal.default_lang) or 'es' }}</span>
+    </div>
+
+    <!-- Resumen activo -->
+    <div class="mt-4">
+      <div class="text-sm font-semibold text-gray-700 mb-1">Resumen</div>
+      <div id="abstract-active" class="text-gray-800 whitespace-pre-wrap">
+        {% set _abs = article.abstracts[0].text if article.abstracts else '' %}
+        {{ _abs }}
+      </div>
+    </div>
+
+    <!-- Palabras clave activas -->
+    <div class="mt-4">
+      <div class="text-sm font-semibold text-gray-700 mb-1">Palabras clave</div>
+      <div id="kwd-active" class="flex flex-wrap gap-2">
+        {% if article.keywords %}
+          {% set lang0 = article.keywords[0].lang if article.keywords else 'es' %}
+          {% set kw_group = article.keywords | selectattr('lang','equalto',lang0) | list %}
+          {% if kw_group %}
+            {% for k in kw_group %}
+              <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-800 text-sm">{{ k.kwd }}</span>
+            {% endfor %}
+          {% else %}
+            <span class="text-gray-400 text-sm italic">—</span>
+          {% endif %}
+        {% else %}
+          <span class="text-gray-400 text-sm italic">—</span>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTENIDO: Secciones (con enriquecido de xrefs) -->
+  <section class="space-y-6 bg-white rounded-xl shadow-sm p-5 mb-6">
+    {% if article.sections %}
+      {% for s in article.sections %}
+        <article id="sec-{{ s.slug or s.id }}" class="bg-white rounded-xl shadow-sm p-5">
+          <header class="mb-3">
+            <h2 class="text-xl font-semibold">{{ s.title or ('Sección ' ~ (s.slug or s.id)) }}</h2>
+            <div class="text-xs text-gray-400">ID: sec-{{ s.slug or s.id }}</div>
+          </header>
+          <div class="prose max-w-none leading-relaxed text-gray-800 whitespace-pre-wrap" data-sec-id="{{ s.id }}">
+            {{ s.content_md or '' }}
+          </div>
+        </article>
+      {% endfor %}
+    {% else %}
+      <div class="text-gray-500">Este artículo aún no tiene secciones.</div>
+    {% endif %}
+  </section>
+
+  <!-- FIGURAS -->
+  <section class="mt-10 bg-white rounded-xl shadow-sm p-5 mb-6">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold">Figuras</h3>
+      <a class="text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+         href="{{ url_for('figure_new', article_id=article.id) }}">➕ Añadir figura</a>
+    </div>
+
+    {% if article.figures %}
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
+        {% for f in article.figures %}
+          <figure id="fig-{{ f.id }}" class="border rounded-xl p-3 bg-gray-50">
+            <div class="text-sm text-gray-500 mb-1">{{ f.label or ('Fig. ' ~ f.id) }}</div>
+            <div class="aspect-[4/3] bg-white rounded-lg overflow-hidden flex items-center justify-center">
+              {% if f.graphic_href %}
+                <img src="{{ f.graphic_href }}" alt="{{ f.caption or f.label or ('Figura ' ~ f.id) }}"
+                     class="w-full h-full object-contain">
+              {% else %}
+                <div class="text-gray-400 text-xs italic">[Sin imagen]</div>
+              {% endif %}
+            </div>
+            {% if f.caption %}
+              <figcaption class="mt-2 text-sm text-gray-700">{{ f.caption }}</figcaption>
+            {% endif %}
+          </figure>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-gray-500 mt-2">No hay figuras.</div>
+    {% endif %}
+  </section>
+
+  <!-- TABLAS -->
+  <section class="mt-10 bg-white rounded-xl shadow-sm p-5 mb-6">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold">Tablas</h3>
+      <a class="text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+         href="{{ url_for('table_new', article_id=article.id) }}">➕ Añadir tabla</a>
+    </div>
+
+    {% if article.tables %}
+      <div class="space-y-4 mt-3">
+        {% for t in article.tables %}
+          <div id="tbl-{{ t.id }}" class="border rounded-xl p-3 bg-gray-50">
+            <div class="text-sm text-gray-500">{{ t.label or ('Tabla ' ~ t.id) }}</div>
+            {% if t.caption %}
+              <div class="text-sm text-gray-700 mt-1">{{ t.caption }}</div>
+            {% endif %}
+            <div class="mt-3 overflow-auto bg-white rounded-lg p-3 border">
+              {{ t.html_table | safe if t.html_table else '<div class="text-gray-400 text-sm italic">[Sin contenido de tabla]</div>' }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-gray-500 mt-2">No hay tablas.</div>
+    {% endif %}
+  </section>
+
+  <!-- REFERENCIAS -->
+  <section class="mt-10 bg-white rounded-xl shadow-sm p-5 mb-6">
+    <h3 class="text-lg font-semibold mb-3">Referencias</h3>
+    {% if article.references %}
+      <ol id="ref-list" class="list-decimal pl-6 space-y-2">
+        {% for r in article.references %}
+          <li id="ref-{{ r.key or ('ref-' ~ r.id) }}" class="text-sm text-gray-800">
+            {{ r.mixed_citation or '—' }}
+            {% if r.doi %}<span class="ml-2 text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">DOI</span>{% endif %}
+            {% if r.pmid %}<span class="ml-2 text-xs px-2 py-0.5 rounded bg-sky-100 text-sky-800">PMID</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <div class="text-gray-500">No hay referencias.</div>
+    {% endif %}
+  </section>
+
+  <!-- Contextos JSON: xrefs + i18n -->
+  <script id="preview-ctx" type="application/json">
+    {
+      "figures": [
+        {% for f in article.figures -%}
+          {
+            "id": {{ f.id }},
+            "label": {{ (f.label or ('Fig. ' ~ f.id))|tojson }},
+            "src": {{ (f.graphic_href or '')|tojson }},
+            "caption": {{ (f.caption or '')|tojson }}
+          }{% if not loop.last %},{% endif %}
+        {%- endfor %}
+      ],
+      "tables": [
+        {% for t in article.tables -%}
+          {"id": {{ t.id }}, "label": {{ (t.label or ('Tabla ' ~ t.id))|tojson }} }{% if not loop.last %},{% endif %}
+        {%- endfor %}
+      ],
+      "sections": [
+        {% for s in article.sections -%}
+          {"id": {{ s.id }}, "slug": {{ (s.slug or '')|tojson }}, "title": {{ (s.title or ('Sección ' ~ (s.slug or s.id)))|tojson }} }{% if not loop.last %},{% endif %}
+        {%- endfor %}
+      ],
+      "references": [
+        {% for r in article.references -%}
+          {"id": {{ r.id }}, "key": {{ (r.key or ('ref-' ~ r.id))|tojson }} }{% if not loop.last %},{% endif %}
+        {%- endfor %}
+      ]
+    }
+  </script>
+
+  <script id="i18n-ctx" type="application/json">
+  {
+    "default_lang": {{ (article.language or (article.journal and article.journal.default_lang) or 'es')|tojson }},
+    "titles": [
+      {% for t in article.titles -%}
+        {"lang": {{ (t.lang or 'es')|tojson }}, "text": {{ (t.text or '')|tojson }} }{% if not loop.last %},{% endif %}
+      {%- endfor %}
+    ],
+    "abstracts": [
+      {% for a in article.abstracts -%}
+        {"lang": {{ (a.lang or 'es')|tojson }}, "text": {{ (a.text or '')|tojson }} }{% if not loop.last %},{% endif %}
+      {%- endfor %}
+    ],
+    "keywords": [
+      {% set bylang = {} %}
+      {% for k in article.keywords %}
+        {% set _ = bylang.setdefault(k.lang or 'es', []).append(k.kwd) %}
+      {% endfor %}
+      {% for lang, arr in bylang.items() -%}
+        {"lang": {{ lang|tojson }}, "kw": {{ arr|tojson }} }{% if not loop.last %},{% endif %}
+      {%- endfor %}
+    ]
+  }
+  </script>
+
+  <!-- Enriquecido xrefs + switch de idioma -->
+  <script>
+    // ===== XREF ENRICH =====
+    const ctx = JSON.parse(document.getElementById('preview-ctx').textContent || '{}');
+    const figMap = new Map((ctx.figures || []).map(f => [String(f.id), f]));
+    const tblMap = new Map((ctx.tables || []).map(t => [String(t.id), t]));
+    const secSlugMap = new Map((ctx.sections || []).filter(s => s.slug).map(s => [s.slug, s]));
+    const secIdMap = new Map((ctx.sections || []).map(s => [String(s.id), s]));
+    const refMap = new Map((ctx.references || []).map(r => [String(r.key), r]));
+
+    const citeOrder = new Map(); // key -> number
+    let citeCounter = 0;
+
+    function badge(html, href, extra="") {
+      const classes = "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium " + extra;
+      return `<a href="${href}" class="${classes}">${html}</a>`;
+    }
+
+    function figInlineHtml(fig, idFallback) {
+      const id = idFallback;
+      const label = fig.label || ('Figura ' + id);
+      const src = fig.src || '';
+      const cap = fig.caption || '';
+
+      if (!src) {
+        // Si no hay imagen, al menos badge
+        return badge(label, `#fig-${id}`, "bg-sky-100 text-sky-800 hover:bg-sky-200");
+      }
+
+      return `
+        <figure class="my-4 border rounded-xl p-3 bg-white shadow-sm">
+          <div class="text-sm font-semibold mb-2">${label}</div>
+          <div class="bg-white rounded-lg overflow-hidden flex items-center justify-center">
+            <img src="${src}" alt="${label}" class="max-w-full h-auto object-contain">
+          </div>
+          ${cap ? `<figcaption class="mt-2 text-sm text-gray-700">${cap}</figcaption>` : ''}
+        </figure>
+      `;
+    }
+
+    function enrichText(text) {
+      if (!text) return '';
+
+      // Citas [cite:Key] -> [n]
+      text = text.replace(/\[cite:([^\]\s]+)\]/g, (_, key) => {
+        const k = String(key);
+        if (!citeOrder.has(k)) citeOrder.set(k, ++citeCounter);
+        const n = citeOrder.get(k);
+        return badge(`[${n}]`, `#ref-${k}`, "bg-amber-100 text-amber-800 hover:bg-amber-200");
+      });
+
+      // Figuras → figura inline
+      text = text.replace(/\[xref:fig:([^\]\s]+)\]/g, (_, id) => {
+        const f = figMap.get(String(id));
+        if (f) {
+          return figInlineHtml(f, id);
+        }
+        const label = `Figura ${id}`;
+        return badge(label, `#fig-${id}`, "bg-sky-100 text-sky-800 hover:bg-sky-200");
+      });
+
+      // Tablas
+      text = text.replace(/\[xref:table:([^\]\s]+)\]/g, (_, id) => {
+        const t = tblMap.get(String(id));
+        const label = t?.label || `Tabla ${id}`;
+        return badge(label, `#tbl-${id}`, "bg-indigo-100 text-indigo-800 hover:bg-indigo-200");
+      });
+
+      // Secciones
+      text = text.replace(/\[xref:sec:([^\]\s]+)\]/g, (_, val) => {
+        const v = String(val);
+        const sec = secSlugMap.get(v) || secIdMap.get(v);
+        const label = sec?.title || `Sección ${v}`;
+        const anchor = `#sec-${sec?.slug || sec?.id || v}`;
+        return badge(label, anchor, "bg-gray-100 text-gray-800 hover:bg-gray-200");
+      });
+
+      return text;
+    }
+
+    document.querySelectorAll('[data-sec-id]').forEach(el => {
+      const raw = el.textContent;
+      el.innerHTML = enrichText(raw);
+    });
+
+    document.addEventListener('click', (ev) => {
+      const a = ev.target.closest('a[href^="#"]');
+      if (!a) return;
+      const id = a.getAttribute('href').slice(1);
+      const target = document.getElementById(id);
+      if (target) {
+        ev.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        target.classList.add('ring','ring-2','ring-emerald-300');
+        setTimeout(() => target.classList.remove('ring','ring-2','ring-emerald-300'), 800);
+      }
+    });
+
+    // ===== I18N SWITCH (titles, abstracts, keywords) =====
+    (function setupLangSwitch(){
+      const i18n = JSON.parse(document.getElementById('i18n-ctx').textContent || '{}');
+      const def = (i18n.default_lang || 'es').toLowerCase();
+
+      // Mapas
+      const titleMap = new Map((i18n.titles || []).map(t => [String(t.lang || '').toLowerCase(), t.text || '']));
+      const absMap   = new Map((i18n.abstracts || []).map(a => [String(a.lang || '').toLowerCase(), a.text || '']));
+      const kwMap    = new Map((i18n.keywords || []).map(k => [String(k.lang || '').toLowerCase(), k.kw || []]));
+
+      // Idiomas disponibles
+      const langsSet = new Set([...titleMap.keys(), ...absMap.keys(), ...kwMap.keys()].filter(Boolean));
+      if (!langsSet.size && def) langsSet.add(def);
+      const langs = Array.from(langsSet);
+
+      const switchWrap = document.getElementById('lang-switch');
+      const titleEl = document.getElementById('title-active');
+      const absEl = document.getElementById('abstract-active');
+      const kwWrap = document.getElementById('kwd-active');
+
+      function renderKeywords(arr){
+        kwWrap.innerHTML = '';
+        if (!arr || !arr.length) {
+          kwWrap.innerHTML = '<span class="text-gray-400 text-sm italic">—</span>';
+          return;
+        }
+        arr.forEach(k => {
+          const span = document.createElement('span');
+          span.className = 'px-2 py-0.5 rounded bg-gray-100 text-gray-800 text-sm';
+          span.textContent = k;
+          kwWrap.appendChild(span);
+        });
+      }
+
+      function applyLang(lang){
+        const l = (lang || def || 'es').toLowerCase();
+        const title =
+          titleMap.get(l) ??
+          titleMap.get(def) ??
+          (i18n.titles && i18n.titles[0] ? i18n.titles[0].text : '(Sin título)');
+        titleEl.textContent = title || '(Sin título)';
+
+        const abstract =
+          absMap.get(l) ??
+          absMap.get(def) ??
+          ((i18n.abstracts && i18n.abstracts[0]) ? i18n.abstracts[0].text : '');
+        absEl.textContent = abstract || '';
+
+        const kws =
+          kwMap.get(l) ??
+          kwMap.get(def) ??
+          ((i18n.keywords && i18n.keywords[0]) ? i18n.keywords[0].kw : []);
+        renderKeywords(kws);
+
+        // Activación visual
+        switchWrap.querySelectorAll('button').forEach(b => {
+          if ((b.dataset.lang || '').toLowerCase() === l) {
+            b.classList.add('bg-blue-600','text-white');
+            b.classList.remove('bg-gray-100','text-gray-700');
+          } else {
+            b.classList.remove('bg-blue-600','text-white');
+            b.classList.add('bg-gray-100','text-gray-700');
+          }
+        });
+      }
+
+      // Render de botones
+      switchWrap.innerHTML = '';
+      langs.forEach(l => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.lang = l;
+        btn.className = 'px-3 py-1 rounded-lg text-sm bg-gray-100 text-gray-700 hover:bg-gray-200';
+        btn.textContent = l;
+        btn.addEventListener('click', () => applyLang(l));
+        switchWrap.appendChild(btn);
+      });
+
+      if (!langs.length) switchWrap.parentElement.classList.add('hidden');
+
+      const initial = langs.includes(def) ? def : (langs[0] || def || 'es');
+      applyLang(initial);
+    })();
+  </script>
+{% endblock %}

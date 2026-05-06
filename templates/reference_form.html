@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import page_header %}
+{% block title %}{{ 'Editar' if ref else 'Nueva' }} referencia · XML JATS{% endblock %}
+{% block content %}
+  {{ page_header(('Editar' if ref else 'Nueva') ~ ' referencia', url_for('article_edit', article_id=article.id)) }}
+
+  <form method="post" class="bg-white p-4 rounded-xl shadow-sm grid gap-4">
+
+    <!-- Tipo de referencia -->
+    <div class="grid md:grid-cols-3 gap-4">
+      <label class="block md:col-span-1">
+        <span class="text-sm text-gray-700">Tipo (JATS publication-type)</span>
+        <select name="pub_type" id="pub_type" class="mt-1 w-full rounded-lg border px-3 py-2">
+          {% for val, label in JATS_PUB_TYPES %}
+            <option value="{{ val }}" {% if ref and ref.pub_type==val %}selected{% endif %}>
+              {{ label }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="block md:col-span-2" id="wrap_pub_type_other" style="display:none">
+        <span class="text-sm text-gray-700">Otro (personalizado)</span>
+        <input name="pub_type_other"
+               value="{% if ref and ref.pub_type and ref.pub_type not in JATS_PUB_TYPE_KEYS %}{{ ref.pub_type }}{% endif %}"
+               class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="p. ej. working-paper">
+        <p class="text-xs text-gray-500 mt-1">Se usará como valor de <code>publication-type</code>.</p>
+      </label>
+    </div>
+
+    <!-- Key, label, DOI -->
+    <div class="grid md:grid-cols-3 gap-4">
+      <label class="block">
+        <span class="text-sm text-gray-700">Clave (Key)</span>
+        <input name="key" value="{{ ref.key if ref else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2"
+               placeholder="p.ej. Corral2009">
+        <p class="text-xs text-gray-500 mt-1">Usada en el texto como [cite:Key]. Si la dejas vacía, se generará ref-&lt;id&gt;.</p>
+      </label>
+
+      <label class="block">
+        <span class="text-sm text-gray-700">Etiqueta (label)</span>
+        <input name="label" value="{{ ref.label if ref and ref.label else '' }}"
+               class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="[27]">
+        <p class="text-xs text-gray-500 mt-1">Se exporta dentro de &lt;label&gt;. Si la dejas vacía, se usará [n] según el orden.</p>
+      </label>
+
+      <label class="block">
+        <span class="text-sm text-gray-700">DOI (opcional)</span>
+        <input name="doi" value="{{ ref.doi if ref else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="10.1234/xyz">
+      </label>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <label class="block">
+        <span class="text-sm text-gray-700">PMID (opcional)</span>
+        <input name="pmid" value="{{ ref.pmid if ref else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="12345678">
+      </label>
+    </div>
+
+    <!-- Autores -->
+    <div>
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-sm font-semibold text-gray-700">Autores de la referencia</span>
+        <button type="button" id="add_ref_author" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm">➕ Añadir autor</button>
+      </div>
+      <div id="ref_authors_list" class="mt-2 grid gap-2">
+        {% if ref and ref.authors %}
+          {% for a in ref.authors %}
+            <div class="grid md:grid-cols-2 gap-2">
+              <input name="ref_author_surname[]" value="{{ a.surname }}" class="rounded-lg border px-3 py-2" placeholder="Apellidos">
+              <input name="ref_author_given[]" value="{{ a.given_names }}" class="rounded-lg border px-3 py-2" placeholder="Nombres">
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="grid md:grid-cols-2 gap-2">
+            <input name="ref_author_surname[]" class="rounded-lg border px-3 py-2" placeholder="Apellidos">
+            <input name="ref_author_given[]" class="rounded-lg border px-3 py-2" placeholder="Nombres">
+          </div>
+        {% endif %}
+      </div>
+      <p class="text-xs text-gray-500 mt-1">Se exportan en &lt;person-group person-group-type="author"&gt;.</p>
+    </div>
+
+    <!-- Datos estructurados -->
+    <div class="grid md:grid-cols-2 gap-4">
+      <label class="block">
+        <span class="text-sm text-gray-700">Título del artículo / capítulo</span>
+        <input name="article_title" value="{{ ref.article_title if ref else '' }}"
+               class="mt-1 w-full rounded-lg border px-3 py-2"
+               placeholder="Validez y confiabilidad de los instrumentos de investigación...">
+      </label>
+      <label class="block">
+        <span class="text-sm text-gray-700">Fuente (revista / libro / actas)</span>
+        <input name="source" value="{{ ref.source if ref else '' }}"
+               class="mt-1 w-full rounded-lg border px-3 py-2"
+               placeholder="Rev. Ciencias la Educ.">
+      </label>
+    </div>
+
+    <div class="grid md:grid-cols-4 gap-4">
+      <label class="block">
+        <span class="text-sm text-gray-700">Volumen</span>
+        <input name="volume" value="{{ ref.volume if ref else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="19">
+      </label>
+      <label class="block">
+        <span class="text-sm text-gray-700">Número (issue)</span>
+        <input name="issue" value="{{ ref.issue if ref else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="33">
+      </label>
+      <label class="block">
+        <span class="text-sm text-gray-700">Página inicial</span>
+        <input name="fpage" value="{{ ref.fpage if ref else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="228">
+      </label>
+      <label class="block">
+        <span class="text-sm text-gray-700">Página final</span>
+        <input name="lpage" value="{{ ref.lpage if ref else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="247">
+      </label>
+    </div>
+
+    <div class="grid md:grid-cols-4 gap-4">
+      <label class="block">
+        <span class="text-sm text-gray-700">Año</span>
+        <input name="year" value="{{ ref.year if ref else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="2009">
+      </label>
+    </div>
+
+    <!-- Cita mixta -->
+    <label class="block">
+      <span class="text-sm text-gray-700">Cita mixta (texto completo)</span>
+      <textarea name="mixed_citation" rows="5" class="mt-1 w-full rounded-lg border px-3 py-2"
+        placeholder="[27] Corral, Y. (2009)...">{{ ref.mixed_citation if ref else '' }}</textarea>
+      <p class="text-xs text-gray-500 mt-1">
+        Se exporta como &lt;mixed-citation&gt;, tal como la vería el lector.
+      </p>
+    </label>
+
+    <div class="flex gap-2">
+      <button class="px-4 py-2 rounded-lg bg-blue-600 text-white">Guardar</button>
+      <a class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300" href="{{ url_for('article_edit', article_id=article.id) }}">Cancelar</a>
+      {% if ref %}
+      <form method="post" action="{{ url_for('reference_delete', ref_id=ref.id) }}"
+            onsubmit="return confirm('¿Eliminar referencia?');" class="inline">
+        <button class="px-4 py-2 rounded-lg bg-red-600 text-white">Eliminar</button>
+      </form>
+      {% endif %}
+    </div>
+  </form>
+
+  <script>
+    (function(){
+      const sel = document.getElementById('pub_type');
+      const wrap = document.getElementById('wrap_pub_type_other');
+      function toggleOther(){
+        wrap.style.display = (sel.value === 'other') ? 'block' : 'none';
+      }
+      sel.addEventListener('change', toggleOther);
+      toggleOther();
+      {% if ref and ref.pub_type and ref.pub_type not in JATS_PUB_TYPE_KEYS %}
+        sel.value = 'other';
+        toggleOther();
+      {% endif %}
+
+      // autores dinámicos
+      const list = document.getElementById('ref_authors_list');
+      document.getElementById('add_ref_author')?.addEventListener('click', () => {
+        const html = `
+          <div class="grid md:grid-cols-2 gap-2">
+            <input name="ref_author_surname[]" class="rounded-lg border px-3 py-2" placeholder="Apellidos">
+            <input name="ref_author_given[]" class="rounded-lg border px-3 py-2" placeholder="Nombres">
+          </div>`;
+        list.insertAdjacentHTML('beforeend', html);
+      });
+    })();
+  </script>
+{% endblock %}

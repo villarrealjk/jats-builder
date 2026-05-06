@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Nuevo usuario{% endblock %}
+
+{% block content %}
+<div class="max-w-xl bg-white p-6 rounded-xl shadow-sm">
+  <h1 class="text-2xl font-bold mb-6">Nuevo usuario</h1>
+
+  <form method="POST" class="space-y-4">
+    <div>
+      <label class="block text-sm font-medium mb-1">Usuario</label>
+      <input name="username" class="w-full border rounded-lg px-3 py-2" required>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-1">Email</label>
+      <input name="email" type="email" class="w-full border rounded-lg px-3 py-2">
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-1">Contraseña</label>
+      <input name="password" type="password" class="w-full border rounded-lg px-3 py-2" required>
+    </div>
+
+    <label class="flex items-center gap-2">
+      <input type="checkbox" name="is_superuser">
+      <span>Crear como superusuario</span>
+    </label>
+
+    <div class="flex gap-2">
+      <button class="px-4 py-2 rounded bg-blue-600 text-white">
+        Guardar
+      </button>
+
+      <a href="{{ url_for('admin_users') }}"
+         class="px-4 py-2 rounded bg-gray-200">
+        Cancelar
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}

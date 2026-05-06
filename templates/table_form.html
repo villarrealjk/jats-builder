@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import page_header %}
+{% block title %}{{ 'Editar' if table else 'Nueva' }} tabla · XML JATS{% endblock %}
+{% block content %}
+  {{ page_header(('Editar' if table else 'Nueva') ~ ' tabla', url_for('article_edit', article_id=article.id)) }}
+
+  <form method="post" class="bg-white p-4 rounded-xl shadow-sm grid gap-6">
+
+    <!-- Metadatos -->
+    <div class="grid md:grid-cols-2 gap-4">
+      <label class="block">
+        <span class="text-sm text-gray-700">Etiqueta</span>
+        <input name="label" value="{{ table.label if table else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Tabla 1">
+      </label>
+      <label class="block">
+        <span class="text-sm text-gray-700">Leyenda</span>
+        <input name="caption" value="{{ table.caption if table else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Resultados descriptivos">
+      </label>
+    </div>
+
+    <!-- Constructor rápido (3 modos) -->
+    <div class="rounded-xl border bg-gray-50 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="font-semibold">Constructor rápido</div>
+        <div class="flex items-center gap-3 text-sm">
+          <label class="inline-flex items-center gap-2">
+            <input id="opt_borders" type="checkbox" class="rounded border" checked>
+            Bordes (preview)
+          </label>
+          <label class="inline-flex items-center gap-2">
+            <input id="opt_zebra" type="checkbox" class="rounded border">
+            Zebra (preview)
+          </label>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex border-b text-sm">
+        <button type="button" data-tab="tab-generate" class="tab-btn px-3 py-2 border-b-2 border-blue-600 text-blue-700">Generar</button>
+        <button type="button" data-tab="tab-csv" class="tab-btn px-3 py-2 border-b-2 border-transparent hover:border-gray-200">CSV/Excel</button>
+        <button type="button" data-tab="tab-editor" class="tab-btn px-3 py-2 border-b-2 border-transparent hover:border-gray-2 00">Editor de celdas</button>
+      </div>
+
+      <!-- A) Generar por tamaño -->
+      <div id="tab-generate" class="tab-pane p-3 bg-white rounded-b-lg border border-t-0">
+        <div class="flex flex-wrap items-end gap-3">
+          <label class="block">
+            <span class="text-xs text-gray-600">Filas</span>
+            <input id="gen_rows" type="number" min="1" value="3" class="mt-1 w-28 rounded-lg border px-3 py-2">
+          </label>
+          <label class="block">
+            <span class="text-xs text-gray-600">Columnas</span>
+            <input id="gen_cols" type="number" min="1" value="3" class="mt-1 w-28 rounded-lg border px-3 py-2">
+          </label>
+          <label class="inline-flex items-center gap-2 mb-1">
+            <input id="gen_header" type="checkbox" class="rounded border" checked>
+            <span class="text-sm">Tiene encabezado</span>
+          </label>
+          <button type="button" id="btn_generate"
+                  class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+            Generar
+          </button>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">Crea una tabla vacía con celdas “—” listas para editar.</p>
+      </div>
+
+      <!-- B) Pegar CSV -->
+      <div id="tab-csv" class="tab-pane hidden p-3 bg-white rounded-b-lg border border-t-0">
+        <div class="text-sm text-gray-700 mb-2">Pegar desde CSV / Excel</div>
+        <textarea id="csv_input" rows="6" class="w-full rounded-lg border px-3 py-2 font-mono"
+          placeholder="Pega aquí datos separados por coma o tab (puedes copiar directamente desde Excel/Sheets)."></textarea>
+        <div class="mt-2 flex items-center justify-between">
+          <label class="inline-flex items-center gap-2">
+            <input id="csv_header" type="checkbox" class="rounded border" checked>
+            Primera fila es encabezado
+          </label>
+          <button type="button" id="btn_from_csv"
+                  class="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+            Construir tabla
+          </button>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">Detecta automáticamente separadores coma o tab.</p>
+      </div>
+
+      <!-- C) Editor de celdas -->
+      <div id="tab-editor" class="tab-pane hidden p-3 bg-white rounded-b-lg border border-t-0">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+          <div class="flex items-center gap-3">
+            <label class="inline-flex items-center gap-2">
+              <input id="ed_has_header" type="checkbox" class="rounded border" checked>
+              Encabezado
+            </label>
+            <button type="button" id="ed_add_row" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300">+ Fila</button>
+            <button type="button" id="ed_add_col" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300">+ Col</button>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-gray-500">
+            <span>Tips: Enter/Tab navega celdas · Doble clic selecciona todo</span>
+          </div>
+        </div>
+
+        <div id="ed_grid_wrap" class="overflow-auto">
+          <table id="ed_grid" class="min-w-[480px] border-collapse">
+            <!-- grid generado por JS -->
+          </table>
+        </div>
+
+        <div class="mt-3 flex items-center gap-2">
+          <button type="button" id="ed_sync_to_html"
+                  class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+            Pasar a HTML
+          </button>
+          <span class="text-xs text-gray-500">Genera el &lt;table&gt; en el textarea y actualiza la vista previa.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- HTML de la tabla (editable) -->
+    <label class="block">
+      <span class="text-sm text-gray-700">HTML de la tabla</span>
+      <textarea id="html_table" name="html_table" rows="8"
+        class="mt-1 w-full rounded-lg border px-3 py-2 font-mono"
+        placeholder="<table><thead>...</thead><tbody>...</tbody></table>">{{ table.html_table if table else '' }}</textarea>
+      <p class="text-xs text-gray-500 mt-1">
+        Puedes editar manualmente. El preview se actualiza en vivo.
+      </p>
+    </label>
+
+    <!-- Vista previa -->
+    <div>
+      <div class="text-sm text-gray-700 mb-1">Vista previa</div>
+      <div id="tbl_preview" class="bg-white rounded-lg p-3 overflow-auto border">
+        {% if table and table.html_table %}
+          {{ table.html_table | safe }}
+        {% else %}
+          <div class="text-gray-400 text-sm italic">La tabla aparecerá aquí…</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Acciones -->
+    <div class="flex gap-2">
+      <button class="px-4 py-2 rounded-lg bg-blue-600 text-white">Guardar</button>
+      <a class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300" href="{{ url_for('article_edit', article_id=article.id) }}">Cancelar</a>
+      {% if table %}
+      <form method="post" action="{{ url_for('table_delete', table_id=table.id) }}"
+            onsubmit="return confirm('¿Eliminar tabla?');" class="inline">
+        <button class="px-4 py-2 rounded-lg bg-red-600 text-white">Eliminar</button>
+      </form>
+      {% endif %}
+    </div>
+  </form>
+
+  <script>
+    // -------- Helpers
+    const $ = (sel) => document.querySelector(sel);
+
+    function escapeHtml(text) {
+      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
+      return text.replace(/[&<>]/g, ch => map[ch]);
+    }
+    function detectDelimiter(text) { return text.includes('\t') ? '\t' : ','; }
+
+    function buildTableHTML(rows, cols, hasHeader, data=null) {
+      rows = Math.max(1, parseInt(rows || 1, 10));
+      cols = Math.max(1, parseInt(cols || 1, 10));
+
+      const get = (r,c) => (data && data[r] && data[r][c] != null) ? data[r][c] : '—';
+
+      let thead = '';
+      let bodyRows = '';
+
+      if (hasHeader) {
+        const headerCells = Array.from({length: cols}).map((_, i) => `<th>${escapeHtml(get(0,i) || ('Col ' + (i+1)))}</th>`).join('');
+        thead = `<thead><tr>${headerCells}</tr></thead>`;
+        // cuerpo comienza en fila 1
+        for (let r = 1; r < rows; r++) {
+          bodyRows += '<tr>' + Array.from({length: cols}).map((_, c) => `<td>${escapeHtml(get(r,c))}</td>`).join('') + '</tr>';
+        }
+      } else {
+        for (let r = 0; r < rows; r++) {
+          bodyRows += '<tr>' + Array.from({length: cols}).map((_, c) => `<td>${escapeHtml(get(r,c))}</td>`).join('') + '</tr>';
+        }
+      }
+      return `<table>${thead}<tbody>${bodyRows}</tbody></table>`;
+    }
+
+    function csvToHTMLTable(text, firstRowHeader) {
+      const delim = detectDelimiter(text);
+      const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+      if (lines.length === 0) return '<table></table>';
+      const rows = lines.map(line => line.split(delim));
+      let thead = '';
+      let start = 0;
+
+      if (firstRowHeader && rows.length > 0) {
+        thead = '<thead><tr>' + rows[0].map(cell => `<th>${escapeHtml(cell.trim())}</th>`).join('') + '</tr></thead>';
+        start = 1;
+      }
+      const bodyRows = rows.slice(start).map(r =>
+        '<tr>' + r.map(cell => `<td>${escapeHtml(cell.trim())}</td>`).join('') + '</tr>'
+      ).join('');
+
+      return `<table>${thead}<tbody>${bodyRows}</tbody></table>`;
+    }
+
+    function applyPreviewDecorations(container, useBorders, useZebra) {
+      const tbl = container.querySelector('table');
+      if (!tbl) return;
+      // Bordes
+      if (useBorders) {
+        tbl.style.borderCollapse = 'collapse';
+        tbl.querySelectorAll('th, td').forEach(el => {
+          el.style.border = '1px solid #e5e7eb';
+          el.style.padding = '6px 10px';
+        });
+      } else {
+        tbl.querySelectorAll('th, td').forEach(el => {
+          el.style.border = '';
+          el.style.padding = '';
+        });
+      }
+      // Zebra
+      if (useZebra) {
+        const rows = tbl.querySelectorAll('tbody tr');
+        rows.forEach((tr, i) => {
+          tr.style.backgroundColor = (i % 2 === 0) ? '#ffffff' : '#f9fafb';
+        });
+      } else {
+        tbl.querySelectorAll('tbody tr').forEach(tr => tr.style.backgroundColor = '');
+      }
+    }
+
+    function syncPreview() {
+      const ta = $('#html_table');
+      const out = $('#tbl_preview');
+      const borders = $('#opt_borders').checked;
+      const zebra = $('#opt_zebra').checked;
+
+      const html = (ta.value || '').trim();
+      out.innerHTML = html || '<div class="text-gray-400 text-sm italic">La tabla aparecerá aquí…</div>';
+      if (html) applyPreviewDecorations(out, borders, zebra);
+    }
+
+    // -------- Tabs
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const panes = document.querySelectorAll('.tab-pane');
+    tabBtns.forEach(btn => btn.addEventListener('click', () => {
+      const t = btn.getAttribute('data-tab');
+      panes.forEach(p => p.classList.add('hidden'));
+      document.getElementById(t).classList.remove('hidden');
+      tabBtns.forEach(b => b.classList.remove('text-blue-700','border-blue-600'));
+      btn.classList.add('text-blue-700','border-blue-600');
+    }));
+
+    // -------- Listeners globales
+    $('#html_table')?.addEventListener('input', syncPreview);
+    $('#opt_borders')?.addEventListener('change', syncPreview);
+    $('#opt_zebra')?.addEventListener('change', syncPreview);
+
+    // Generar por tamaño
+    $('#btn_generate')?.addEventListener('click', () => {
+      const r = parseInt($('#gen_rows').value || '3', 10);
+      const c = parseInt($('#gen_cols').value || '3', 10);
+      const h = $('#gen_header').checked;
+
+      // Para editor: también regeneramos grilla
+      editor.rows = Math.max(1, r);
+      editor.cols = Math.max(1, c);
+      editor.hasHeader = !!h;
+      editor.data = Array.from({length: editor.rows}).map(() => Array.from({length: editor.cols}).map(() => '—'));
+      renderEditor();
+
+      $('#html_table').value = buildTableHTML(editor.rows, editor.cols, editor.hasHeader, editor.data);
+      syncPreview();
+    });
+
+    // CSV a HTML (y al editor)
+    $('#btn_from_csv')?.addEventListener('click', () => {
+      const txt = $('#csv_input').value.trim();
+      if (!txt) return;
+      const firstHeader = $('#csv_header').checked;
+
+      // Parseamos CSV a data (para el editor)
+      const delim = detectDelimiter(txt);
+      const rows = txt.split(/\r?\n/).filter(l => l.trim() !== '').map(line => line.split(delim).map(s => s.trim()));
+      editor.rows = rows.length;
+      editor.cols = Math.max(...rows.map(r => r.length));
+      editor.hasHeader = !!firstHeader;
+      editor.data = rows.map(r => {
+        const row = Array.from({length: editor.cols}).map((_,i) => r[i] || '');
+        return row;
+      });
+      renderEditor();
+
+      $('#html_table').value = csvToHTMLTable(txt, firstHeader);
+      syncPreview();
+    });
+
+    // -------- Editor de celdas
+    const editor = {
+      rows: 3,
+      cols: 3,
+      hasHeader: true,
+      data: Array.from({length: 3}).map(() => Array.from({length: 3}).map(() => '—')),
+    };
+
+    function renderEditor() {
+      const tbl = $('#ed_grid');
+      tbl.innerHTML = '';
+      // Header
+      if (editor.hasHeader) {
+        const tr = document.createElement('tr');
+        for (let c=0; c<editor.cols; c++) {
+          const th = document.createElement('th');
+          th.className = 'border bg-gray-50 text-left px-2 py-1';
+          const inp = document.createElement('input');
+          inp.className = 'w-40 md:w-56 border rounded px-2 py-1';
+          inp.value = editor.data[0]?.[c] ?? '';
+          inp.addEventListener('dblclick', e => e.target.select());
+          inp.addEventListener('input', e => { editor.data[0][c] = e.target.value; });
+          th.appendChild(inp);
+          tr.appendChild(th);
+        }
+        // Col delete
+        const thCtl = document.createElement('th');
+        thCtl.className = 'border px-2 py-1 text-center text-xs text-gray-500';
+        thCtl.textContent = '—';
+        tr.appendChild(thCtl);
+        tbl.appendChild(tr);
+      }
+
+      // Body rows
+      const startR = editor.hasHeader ? 1 : 0;
+      for (let r=startR; r<editor.rows; r++) {
+        const tr = document.createElement('tr');
+        for (let c=0; c<editor.cols; c++) {
+          const td = document.createElement('td');
+          td.className = 'border px-2 py-1';
+          const inp = document.createElement('input');
+          inp.className = 'w-40 md:w-56 border rounded px-2 py-1';
+          inp.value = editor.data[r]?.[c] ?? '';
+          inp.addEventListener('dblclick', e => e.target.select());
+          inp.addEventListener('input', e => { editor.data[r][c] = e.target.value; });
+          td.appendChild(inp);
+          tr.appendChild(td);
+        }
+        // Botón eliminar fila
+        const tdCtl = document.createElement('td');
+        tdCtl.className = 'border px-2 py-1 text-center';
+        const btnDel = document.createElement('button');
+        btnDel.type = 'button';
+        btnDel.className = 'px-2 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700 text-xs';
+        btnDel.textContent = 'Eliminar fila';
+        btnDel.addEventListener('click', () => {
+          editor.data.splice(r, 1);
+          editor.rows = Math.max(1, editor.rows - 1);
+          renderEditor();
+        });
+        tdCtl.appendChild(btnDel);
+        tr.appendChild(tdCtl);
+        tbl.appendChild(tr);
+      }
+
+      // Fila controles columnas (abajo)
+      const trCtl = document.createElement('tr');
+      for (let c=0; c<editor.cols; c++) {
+        const td = document.createElement('td');
+        td.className = 'border px-2 py-1 text-center';
+        const btnDelC = document.createElement('button');
+        btnDelC.type = 'button';
+        btnDelC.className = 'px-2 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700 text-xs';
+        btnDelC.textContent = 'Eliminar col';
+        btnDelC.addEventListener('click', () => {
+          for (let r=0; r<editor.rows; r++) {
+            (editor.data[r] ||= []).splice(c, 1);
+          }
+          editor.cols = Math.max(1, editor.cols - 1);
+          renderEditor();
+        });
+        td.appendChild(btnDelC);
+        trCtl.appendChild(td);
+      }
+      const tdVoid = document.createElement('td');
+      tdVoid.className = 'border px-2 py-1';
+      trCtl.appendChild(tdVoid);
+      tbl.appendChild(trCtl);
+    }
+
+    // Eventos del editor
+    $('#ed_add_row')?.addEventListener('click', () => {
+      const newRow = Array.from({length: editor.cols}).map(() => '');
+      editor.data.push(newRow);
+      editor.rows += 1;
+      renderEditor();
+    });
+    $('#ed_add_col')?.addEventListener('click', () => {
+      for (let r=0; r<editor.rows; r++) {
+        (editor.data[r] ||= []).push('');
+      }
+      editor.cols += 1;
+      renderEditor();
+    });
+    $('#ed_has_header')?.addEventListener('change', (e) => {
+      editor.hasHeader = !!e.target.checked;
+      // si activas encabezado y no existe fila 0, la creamos
+      if (editor.hasHeader && editor.data.length === 0) {
+        editor.data.push(Array.from({length: editor.cols}).map(() => ''));
+        editor.rows = 1;
+      } else if (!editor.hasHeader && editor.rows === 0) {
+        editor.rows = 1;
+        editor.data = [Array.from({length: editor.cols}).map(() => '')];
+      }
+      // asegura al menos 1 fila total
+      if (editor.rows < 1) { editor.rows = 1; editor.data = [Array.from({length: editor.cols}).map(() => '')]; }
+      renderEditor();
+    });
+
+    // Sincronizar editor → HTML
+    $('#ed_sync_to_html')?.addEventListener('click', () => {
+      const html = buildTableHTML(editor.rows, editor.cols, editor.hasHeader, editor.data);
+      $('#html_table').value = html;
+      syncPreview();
+    });
+
+    // Inicialización: si hay HTML existente, lo parseamos al editor (simple)
+    (function bootstrapEditorFromHTML() {
+      const html = ($('#html_table').value || '').trim();
+      if (!html) { renderEditor(); syncPreview(); return; }
+      // parseo mínimo
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      const table = temp.querySelector('table');
+      if (!table) { renderEditor(); syncPreview(); return; }
+
+      const thead = table.querySelector('thead');
+      const tbody = table.querySelector('tbody');
+      const rows = [];
+      if (thead) {
+        const tr = thead.querySelector('tr');
+        if (tr) rows.push(Array.from(tr.children).map(c => (c.textContent || '').trim()));
+      }
+      if (tbody) {
+        tbody.querySelectorAll('tr').forEach(tr => {
+          rows.push(Array.from(tr.children).map(c => (c.textContent || '').trim()));
+        });
+      }
+      if (rows.length) {
+        editor.rows = rows.length;
+        editor.cols = Math.max(...rows.map(r => r.length));
+        editor.hasHeader = !!thead;
+        editor.data = rows.map(r => {
+          const row = Array.from({length: editor.cols}).map((_,i) => r[i] || '');
+          return row;
+        });
+      }
+      renderEditor();
+      syncPreview();
+    })();
+  </script>
+{% endblock %}

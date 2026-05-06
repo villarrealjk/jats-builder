@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import page_header %}
+{% block title %}{{ 'Editar' if section else 'Nueva' }} sección · XML JATS{% endblock %}
+{% block content %}
+  {{ page_header(('Editar' if section else 'Nueva') ~ ' sección', url_for('article_edit', article_id=article.id)) }}
+
+  <form method="post" class="grid lg:grid-cols-3 gap-6">
+    <!-- Columna izquierda: formulario principal -->
+    <div class="lg:col-span-2 bg-white p-4 rounded-xl shadow-sm grid gap-4">
+      <div class="grid md:grid-cols-2 gap-4">
+        <label class="block">
+          <span class="text-sm text-gray-700">Título de la sección</span>
+          <input name="title" value="{{ section.title if section else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2">
+        </label>
+        <label class="block">
+          <span class="text-sm text-gray-700">Slug (opcional)</span>
+          <input name="slug" value="{{ section.slug if section else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="metodos">
+          <p class="text-xs text-gray-500 mt-1">Permite xref: [xref:sec:slug]. Si lo omites, podrás usar el ID numérico.</p>
+        </label>
+      </div>
+
+      <label class="block">
+        <span class="text-sm text-gray-700">Contenido (admite marcadores xref)</span>
+        <textarea id="content_md" name="content_md" rows="14" class="mt-1 w-full rounded-lg border px-3 py-2 font-mono">{{ section.content_md if section else '' }}</textarea>
+        <p class="text-xs text-gray-500 mt-1">Usa el asistente para insertar referencias: [cite:Key], [xref:fig:ID], [xref:table:ID], [xref:sec:slug].</p>
+      </label>
+
+      <div class="flex gap-2">
+        <button class="px-4 py-2 rounded-lg bg-blue-600 text-white">Guardar</button>
+        <a class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300" href="{{ url_for('article_edit', article_id=article.id) }}">Cancelar</a>
+      </div>
+    </div>
+
+    <!-- Columna derecha: asistente xref -->
+    <aside class="bg-white p-4 rounded-xl shadow-sm">
+      <div class="text-lg font-semibold mb-3">Asistente de referencias cruzadas</div>
+
+            <!-- Referencias bibliográficas -->
+      <div class="mb-5">
+        <div class="text-sm font-medium mb-1">Citar bibliografía</div>
+
+        <select id="sel_ref" class="w-full rounded-lg border px-3 py-2">
+          <option value="">— Selecciona referencia —</option>
+          {% for r in article.references %}
+            <option value="{{ r.key or ('ref-' ~ r.id) }}">
+              {{ r.key or ('ref-' ~ r.id) }} — {{ (r.mixed_citation or '')[:90] }}
+            </option>
+          {% endfor %}
+        </select>
+
+        <button
+          type="button"
+          id="btn_insert_cite"
+          class="mt-2 px-3 py-2 rounded-lg bg-sky-600 text-white w-full"
+        >
+          Insertar [cite:Key]
+        </button>
+      </div>
+
+
+      <!-- Figuras -->
+      <div class="mb-5">
+        <div class="text-sm font-medium mb-1">Enlazar figura</div>
+        <select id="sel_fig" class="w-full rounded-lg border px-3 py-2">
+          <option value="">— Selecciona figura —</option>
+          {% for f in article.figures %}
+            <option value="{{ f.id }}">Figura {{ f.id }} — {{ f.label }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" id="btn_insert_fig" class="mt-2 px-3 py-2 rounded-lg bg-sky-600 text-white w-full">Insertar [xref:fig:ID]</button>
+      </div>
+
+      <!-- Tablas -->
+      <div class="mb-5">
+        <div class="text-sm font-medium mb-1">Enlazar tabla</div>
+        <select id="sel_tbl" class="w-full rounded-lg border px-3 py-2">
+          <option value="">— Selecciona tabla —</option>
+          {% for t in article.tables %}
+            <option value="{{ t.id }}">{{ t.label or ('Tabla ' ~ t.id) }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" id="btn_insert_tbl" class="mt-2 px-3 py-2 rounded-lg bg-indigo-600 text-white w-full">Insertar [xref:table:ID]</button>
+      </div>
+
+      <!-- Secciones -->
+      <div class="mb-5">
+        <div class="text-sm font-medium mb-1">Enlazar sección</div>
+        <select id="sel_sec" class="w-full rounded-lg border px-3 py-2">
+          <option value="">— Selecciona sección —</option>
+          {% for s in article.sections %}
+            <option value="{{ s.slug or s.id }}">{{ s.title }} ({{ s.slug or s.id }})</option>
+          {% endfor %}
+        </select>
+        <button type="button" id="btn_insert_sec" class="mt-2 px-3 py-2 rounded-lg bg-gray-800 text-white w-full">Insertar [xref:sec:...]</button>
+      </div>
+
+      <div class="text-xs text-gray-500">
+        Los marcadores se exportan a <code>&lt;xref&gt;</code> en JATS por el exportador.
+      </div>
+    </aside>
+  </form>
+
+  <script>
+    // Inserta texto en el textarea en la posición del cursor
+    function insertAtCursor(el, text) {
+      el.focus();
+      const start = el.selectionStart ?? el.value.length;
+      const end = el.selectionEnd ?? el.value.length;
+      const before = el.value.slice(0, start);
+      const after = el.value.slice(end);
+      el.value = before + text + after;
+      // recolocar el cursor al final del texto insertado
+      const pos = start + text.length;
+      el.setSelectionRange(pos, pos);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    const ta = document.getElementById('content_md');
+
+    document.getElementById('btn_insert_cite')?.addEventListener('click', () => {
+      const key = document.getElementById('sel_ref').value.trim();
+      if (!key) return;
+      insertAtCursor(ta, ` [cite:${key}] `);
+    });
+
+    document.getElementById('btn_insert_fig')?.addEventListener('click', () => {
+      const id = document.getElementById('sel_fig').value.trim();
+      if (!id) return;
+      insertAtCursor(ta, `[xref:fig:${id}]`);
+    });
+
+    document.getElementById('btn_insert_tbl')?.addEventListener('click', () => {
+      const id = document.getElementById('sel_tbl').value.trim();
+      if (!id) return;
+      insertAtCursor(ta, `[xref:table:${id}]`);
+    });
+
+    document.getElementById('btn_insert_sec')?.addEventListener('click', () => {
+      const val = document.getElementById('sel_sec').value.trim();
+      if (!val) return;
+      insertAtCursor(ta, `[xref:sec:${val}]`);
+    });
+  </script>
+{% endblock %}

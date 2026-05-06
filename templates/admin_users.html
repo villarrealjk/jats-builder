@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Administrar usuarios{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Usuarios</h1>
+
+  <a href="{{ url_for('admin_user_new') }}"
+     class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
+    Nuevo usuario
+  </a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="text-left p-3">ID</th>
+        <th class="text-left p-3">Usuario</th>
+        <th class="text-left p-3">Email</th>
+        <th class="text-left p-3">Rol</th>
+        <th class="text-left p-3">Estado</th>
+        <th class="text-left p-3">Acciones</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for user in users %}
+      <tr class="border-t">
+        <td class="p-3">{{ user.id }}</td>
+        <td class="p-3 font-medium">{{ user.username }}</td>
+        <td class="p-3">{{ user.email or "-" }}</td>
+
+        <td class="p-3">
+          {% if user.is_superuser %}
+            <span class="px-2 py-1 rounded bg-purple-100 text-purple-700 text-xs">
+              Superusuario
+            </span>
+          {% else %}
+            <span class="px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs">
+              Usuario
+            </span>
+          {% endif %}
+        </td>
+
+        <td class="p-3">
+          {% if user.is_active_user %}
+            <span class="px-2 py-1 rounded bg-green-100 text-green-700 text-xs">
+              Activo
+            </span>
+          {% else %}
+            <span class="px-2 py-1 rounded bg-red-100 text-red-700 text-xs">
+              Inactivo
+            </span>
+          {% endif %}
+        </td>
+
+        <td class="p-3 flex gap-2">
+          {% if user.id != current_user.id %}
+            <form method="POST" action="{{ url_for('admin_user_toggle_active', user_id=user.id) }}">
+              <button class="px-3 py-1 rounded bg-yellow-500 text-white">
+                {% if user.is_active_user %}Desactivar{% else %}Activar{% endif %}
+              </button>
+            </form>
+
+            <form method="POST" action="{{ url_for('admin_user_toggle_superuser', user_id=user.id) }}">
+              <button class="px-3 py-1 rounded bg-purple-600 text-white">
+                {% if user.is_superuser %}Quitar admin{% else %}Hacer admin{% endif %}
+              </button>
+            </form>
+          {% else %}
+            <span class="text-gray-400">Usuario actual</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

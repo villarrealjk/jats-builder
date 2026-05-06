@@ -1,0 +1,416 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if article else 'Nuevo' }} artículo · XML JATS{% endblock %}
+{% from "macros/components.html" import page_header %}
+{% block content %}
+  {{ page_header(('Editar' if article else 'Nuevo') ~ ' artículo', url_for('index')) }}
+  
+<form method="post" class="bg-white p-4 rounded-xl shadow-sm grid gap-4">
+
+  <!-- Selección de revista -->
+  <label class="block">
+    <span class="text-sm text-gray-700">Revista</span>
+    <select name="journal_id" id="journal_id" class="mt-1 w-full rounded-lg border px-3 py-2">
+      <option value="">— Selecciona —</option>
+      {% for j in journals %}
+        <option value="{{ j.id }}" {% if article and article.journal_id==j.id %}selected{% endif %}>{{ j.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <!-- Mostrar datos precargados de la revista -->
+  <div id="journal_meta" class="grid md:grid-cols-3 gap-4 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
+    <div><span class="font-medium">ISSN impreso:</span> <span id="jm_issn_print">—</span></div>
+    <div><span class="font-medium">ISSN electrónico:</span> <span id="jm_issn_electronic">—</span></div>
+    <div><span class="font-medium">Editorial:</span> <span id="jm_publisher">—</span></div>
+    <div><span class="font-medium">País:</span> <span id="jm_country">—</span></div>
+    <div><span class="font-medium">Abrev.:</span> <span id="jm_abbrev">—</span></div>
+    <div><span class="font-medium">Idioma por defecto:</span> <span id="jm_lang">—</span></div>
+  </div>
+
+  <!-- DOI e idioma principal -->
+  <div class="grid md:grid-cols-2 gap-4">
+    <label class="block">
+      <span class="text-sm text-gray-700">DOI</span>
+      <input name="doi" value="{{ article.doi if article else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2">
+    </label>
+    <label class="block">
+      <span class="text-sm text-gray-700">Idioma principal (ISO)</span>
+      <input name="language" value="{{ article.language if article else 'es' }}" class="mt-1 w-full rounded-lg border px-3 py-2">
+    </label>
+  </div>
+
+  <!-- Títulos multilingües -->
+  <div>
+    <div class="flex items-center justify-between">
+      <span class="text-sm font-semibold">Títulos</span>
+      <button type="button" id="add_title" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300">➕ Añadir</button>
+    </div>
+    <div id="title_list" class="mt-2 grid gap-2">
+      {% if article and article.titles %}
+        {% for t in article.titles %}
+        <div class="grid md:grid-cols-6 gap-2">
+          <input name="title_text[]" value="{{ t.text }}" class="md:col-span-5 rounded-lg border px-3 py-2" placeholder="Título">
+          <input name="title_lang[]" value="{{ t.lang }}" class="rounded-lg border px-3 py-2" placeholder="es">
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="grid md:grid-cols-6 gap-2">
+          <input name="title_text[]" class="md:col-span-5 rounded-lg border px-3 py-2" placeholder="Título">
+          <input name="title_lang[]" value="es" class="rounded-lg border px-3 py-2" placeholder="es">
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Resúmenes multilingües -->
+  <div>
+    <div class="flex items-center justify-between">
+      <span class="text-sm font-semibold">Resúmenes</span>
+      <button type="button" id="add_abs" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300">➕ Añadir</button>
+    </div>
+    <div id="abs_list" class="mt-2 grid gap-2">
+      {% if article and article.abstracts %}
+        {% for ab in article.abstracts %}
+        <div class="grid md:grid-cols-6 gap-2">
+          <textarea name="abs_text[]" rows="3" class="md:col-span-5 rounded-lg border px-3 py-2" placeholder="Resumen">{{ ab.text }}</textarea>
+          <input name="abs_lang[]" value="{{ ab.lang }}" class="rounded-lg border px-3 py-2" placeholder="es">
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="grid md:grid-cols-6 gap-2">
+          <textarea name="abs_text[]" rows="3" class="md:col-span-5 rounded-lg border px-3 py-2" placeholder="Resumen"></textarea>
+          <input name="abs_lang[]" value="es" class="rounded-lg border px-3 py-2" placeholder="es">
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Palabras clave multilingües -->
+  <div>
+    <div class="flex items-center justify-between">
+      <span class="text-sm font-semibold">Palabras clave (separadas por coma)</span>
+      <button type="button" id="add_kwd" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300">➕ Añadir</button>
+    </div>
+    <div id="kwd_list" class="mt-2 grid gap-2">
+      {% if article and article.keywords %}
+        {% for g in article.keywords|groupby('lang') %}
+          <div class="grid md:grid-cols-6 gap-2">
+            <input name="kwd_text[]" value="{{ g.list | map(attribute='kwd') | join(', ') }}" class="md:col-span-5 rounded-lg border px-3 py-2" placeholder="p. ej. aprendizaje, IA, educación">
+            <input name="kwd_lang[]" value="{{ g.grouper }}" class="rounded-lg border px-3 py-2" placeholder="es">
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="grid md:grid-cols-6 gap-2">
+          <input name="kwd_text[]" class="md:col-span-5 rounded-lg border px-3 py-2" placeholder="p. ej. aprendizaje, IA, educación">
+          <input name="kwd_lang[]" value="es" class="rounded-lg border px-3 py-2" placeholder="es">
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Paginación o elocation -->
+  <div class="grid md:grid-cols-3 gap-4">
+    <label class="block">
+      <span class="text-sm text-gray-700">Página inicial (impreso)</span>
+      <input name="fpage" value="{{ article.fpage if article else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2">
+    </label>
+    <label class="block">
+      <span class="text-sm text-gray-700">Página final (impreso)</span>
+      <input name="lpage" value="{{ article.lpage if article else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2">
+    </label>
+    <label class="block">
+      <span class="text-sm text-gray-700">Elocation ID (electrónico)</span>
+      <input name="elocation_id" value="{{ article.elocation_id if article else '' }}" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="e12345">
+    </label>
+  </div>
+
+  <div>
+    <button class="px-4 py-2 rounded-lg bg-blue-600 text-white">Guardar</button>
+  </div>
+</form>
+
+{% if article %}
+
+<!-- 🔹 Panel de autores -->
+<div class="mt-8 bg-white p-4 rounded-xl shadow-sm">
+  <div class="flex items-center justify-between mb-2">
+    <div class="font-semibold">Autores</div>
+    <a class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
+       href="{{ url_for('author_new', article_id=article.id) }}">➕ Añadir autor</a>
+  </div>
+  <ul class="divide-y">
+    {% for au in article.authors %}
+      <li class="py-2 flex items-center justify-between">
+        <div>
+          <div class="font-medium">{{ au.surname }}, {{ au.given_names }}</div>
+          <div class="text-sm text-gray-500">
+            {% if au.orcid %}ORCID: {{ au.orcid }} · {% endif %}
+            {{ au.affiliation or '—' }}
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <a class="px-2 py-1 rounded bg-sky-600 text-white"
+             href="{{ url_for('author_edit', author_id=au.id) }}">Editar</a>
+          <form method="post" action="{{ url_for('author_delete', author_id=au.id) }}"
+                onsubmit="return confirm('¿Eliminar autor?');">
+            <button class="px-2 py-1 rounded bg-red-600 text-white">Eliminar</button>
+          </form>
+        </div>
+      </li>
+    {% else %}
+      <li class="py-2 text-gray-500">Sin autores</li>
+    {% endfor %}
+  </ul>
+</div>
+
+{% if article %}
+<!-- 🔹 Panel de secciones -->
+<div class="mt-8 bg-white p-4 rounded-xl shadow-sm">
+  <div class="flex items-center justify-between mb-3">
+    <div class="font-semibold">Secciones</div>
+    <a class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
+       href="{{ url_for('section_new', article_id=article.id) }}">➕ Añadir sección</a>
+  </div>
+
+  {% if article.sections %}
+    <div class="space-y-4">
+      {% for s in article.sections %}
+        <div class="border rounded-xl p-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-sm font-medium text-gray-800">
+                {{ s.title or ('Sección ' ~ (s.slug or s.id)) }}
+              </div>
+              <div class="text-xs text-gray-500 mt-0.5">
+                ID: sec-{{ s.slug or s.id }}{% if s.slug %} · slug: {{ s.slug }}{% endif %}
+              </div>
+              {% if s.content_md %}
+              <div class="mt-2 text-sm text-gray-700 line-clamp-3 whitespace-pre-wrap">
+                {{ s.content_md }}
+              </div>
+              {% else %}
+              <div class="mt-2 text-sm text-gray-500 italic">[Sin contenido]</div>
+              {% endif %}
+            </div>
+            <div class="flex gap-2 self-start items-center">
+              <a class="inline-flex items-center justify-center px-3 h-9 rounded bg-sky-600 text-white text-sm hover:bg-sky-700 whitespace-nowrap" href="{{ url_for('section_edit', section_id=s.id) }}">Editar</a>
+              <form method="post" action="{{ url_for('section_delete', section_id=s.id) }}"
+                onsubmit="return confirm('¿Eliminar sección?');" class="inline">
+                <button class="inline-flex items-center justify-center px-3 h-9 rounded bg-red-600 text-white text-sm hover:bg-red-700 whitespace-nowrap">Eliminar</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-gray-500">No hay secciones aún.</div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- 🔹 Panel de figuras (nuevo) -->
+<div class="mt-8 bg-white p-4 rounded-xl shadow-sm">
+  <div class="flex items-center justify-between mb-3">
+    <div class="font-semibold">Figuras</div>
+    <a class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
+       href="{{ url_for('figure_new', article_id=article.id) }}">➕ Añadir figura</a>
+  </div>
+
+  {% if article.figures %}
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% for f in article.figures %}
+        <div class="border rounded-xl p-3 flex flex-col">
+          <div class="text-sm text-gray-500 mb-1">
+            {{ f.label or ('Fig. ' ~ f.id) }}
+          </div>
+
+          <div class="aspect-[4/3] bg-gray-50 rounded-lg overflow-hidden flex items-center justify-center">
+            {% if f.graphic_href %}
+              <img src="{{ f.graphic_href }}"
+                   alt="{{ f.caption or ('Figura ' ~ f.id) }}"
+                   class="w-full h-full object-contain">
+            {% else %}
+              <div class="text-gray-400 text-xs italic">[Sin imagen]</div>
+            {% endif %}
+          </div>
+
+          {% if f.caption %}
+            <div class="mt-2 text-sm text-gray-700 line-clamp-2">{{ f.caption }}</div>
+          {% endif %}
+
+          <div class="mt-2 text-xs text-gray-400">ID: fig-{{ f.id }}</div>
+
+          <div class="mt-3 flex gap-2">
+            <a class="px-2 py-1 rounded bg-sky-600 text-white"
+               href="{{ url_for('figure_edit', figure_id=f.id) }}">Editar</a>
+            <form method="post" action="{{ url_for('figure_delete', figure_id=f.id) }}"
+                  onsubmit="return confirm('¿Eliminar figura?');">
+              <button class="px-2 py-1 rounded bg-red-600 text-white">Eliminar</button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-gray-500">No hay figuras aún.</div>
+  {% endif %}
+</div>
+
+<!-- 🔹 Panel de tablas -->
+<div class="mt-8 bg-white p-4 rounded-xl shadow-sm">
+  <div class="flex items-center justify-between mb-3">
+    <div class="font-semibold">Tablas</div>
+    <a class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
+       href="{{ url_for('table_new', article_id=article.id) }}">➕ Añadir tabla</a>
+  </div>
+
+  {% if article.tables %}
+    <div class="space-y-4">
+      {% for t in article.tables %}
+        <div class="border rounded-xl p-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-sm text-gray-500">
+                {{ t.label or ('Tabla ' ~ t.id) }}
+              </div>
+              {% if t.caption %}
+                <div class="text-sm text-gray-700 mt-1 line-clamp-2">{{ t.caption }}</div>
+              {% endif %}
+              <div class="mt-1 text-xs text-gray-400">ID: tbl-{{ t.id }}</div>
+            </div>
+            <div class="shrink-0 flex gap-2">
+              <a class="px-2 py-1 rounded bg-sky-600 text-white"
+                 href="{{ url_for('table_edit', table_id=t.id) }}">Editar</a>
+              <form method="post" action="{{ url_for('table_delete', table_id=t.id) }}"
+                    onsubmit="return confirm('¿Eliminar tabla?');">
+                <button class="px-2 py-1 rounded bg-red-600 text-white">Eliminar</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="mt-3 overflow-auto bg-gray-50 rounded-lg p-3 border">
+            {% if t.html_table %}
+              {{ t.html_table | safe }}
+            {% else %}
+              <div class="text-gray-400 text-sm italic">[Sin contenido de tabla]</div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-gray-500">No hay tablas aún.</div>
+  {% endif %}
+</div>
+
+{% if article %}
+<!-- 🔹 Panel de referencias -->
+<div class="mt-8 bg-white p-4 rounded-xl shadow-sm">
+  <div class="flex items-center justify-between mb-3">
+    <div class="font-semibold">Referencias</div>
+    <a class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
+       href="{{ url_for('reference_new', article_id=article.id) }}">➕ Añadir referencia</a>
+  </div>
+
+  {% if article.references %}
+    <div class="space-y-3">
+      {% for r in article.references %}
+        <div class="border rounded-xl p-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-sm text-gray-800">
+                <span class="text-xs px-2 py-0.5 rounded bg-gray-100 mr-2">Key: {{ r.key or ('ref-' ~ r.id) }}</span>
+                <span class="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800 mr-2">
+                  {{ r.pub_type or 'journal' }}
+                </span>
+                {% if r.doi %}<span class="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">DOI</span>{% endif %}
+                {% if r.pmid %}<span class="text-xs px-2 py-0.5 rounded bg-sky-100 text-sky-800">PMID</span>{% endif %}
+              </div>
+
+              <div class="mt-1 text-sm text-gray-700">
+                {{ (r.mixed_citation or '—') }}
+              </div>
+            </div>
+            <div class="flex gap-2 self-start items-center">
+              <a class="inline-flex items-center justify-center px-3 h-9 rounded bg-sky-600 text-white text-sm hover:bg-sky-700"
+                 href="{{ url_for('reference_edit', ref_id=r.id) }}">Editar</a>
+              <form method="post" action="{{ url_for('reference_delete', ref_id=r.id) }}"
+                    onsubmit="return confirm('¿Eliminar referencia?');" class="inline">
+                <button class="inline-flex items-center justify-center px-3 h-9 rounded bg-red-600 text-white text-sm hover:bg-red-700">
+                  Eliminar
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-gray-500">No hay referencias aún.</div>
+  {% endif %}
+</div>
+{% endif %}
+
+
+<!-- Accesos rápidos a otros formularios -->
+<div class="mt-8 grid md:grid-cols-2 gap-4">
+  <a class="block p-4 bg-white rounded-xl shadow-sm hover:bg-gray-50" href="{{ url_for('section_new', article_id=article.id) }}">➕ Agregar sección</a>
+  <a class="block p-4 bg-white rounded-xl shadow-sm hover:bg-gray-50" href="{{ url_for('figure_new', article_id=article.id) }}">➕ Agregar figura</a>
+  <a class="block p-4 bg-white rounded-xl shadow-sm hover:bg-gray-50" href="{{ url_for('table_new', article_id=article.id) }}">➕ Agregar tabla</a>
+  <a class="block p-4 bg-white rounded-xl shadow-sm hover:bg-gray-50" href="{{ url_for('reference_new', article_id=article.id) }}">➕ Agregar referencia</a>
+</div>
+
+<div class="mt-8">
+  <a class="px-4 py-2 rounded-lg bg-gray-800 text-white" href="{{ url_for('preview', article_id=article.id) }}">Vista previa</a>
+  <a class="px-4 py-2 rounded-lg bg-emerald-700 text-white" href="{{ url_for('export_jats', article_id=article.id) }}">Exportar JATS</a>
+</div>
+
+{% endif %}
+
+<script>
+  // Añadir dinámicamente campos (títulos, resúmenes, keywords)
+  const addBlock = (targetId, html) => {
+    const container = document.getElementById(targetId);
+    container.insertAdjacentHTML("beforeend", html);
+  };
+  document.getElementById('add_title')?.addEventListener('click', () => {
+    addBlock('title_list', `<div class="grid md:grid-cols-6 gap-2"><input name="title_text[]" class="md:col-span-5 rounded-lg border px-3 py-2" placeholder="Título"><input name="title_lang[]" value="es" class="rounded-lg border px-3 py-2" placeholder="es"></div>`);
+  });
+  document.getElementById('add_abs')?.addEventListener('click', () => {
+    addBlock('abs_list', `<div class="grid md:grid-cols-6 gap-2"><textarea name="abs_text[]" rows="3" class="md:col-span-5 rounded-lg border px-3 py-2" placeholder="Resumen"></textarea><input name="abs_lang[]" value="es" class="rounded-lg border px-3 py-2" placeholder="es"></div>`);
+  });
+  document.getElementById('add_kwd')?.addEventListener('click', () => {
+    addBlock('kwd_list', `<div class="grid md:grid-cols-6 gap-2"><input name="kwd_text[]" class="md:col-span-5 rounded-lg border px-3 py-2" placeholder="p. ej. aprendizaje, IA, educación"><input name="kwd_lang[]" value="es" class="rounded-lg border px-3 py-2" placeholder="es"></div>`);
+  });
+
+  // Precargar metadatos de la revista
+  const fillJournal = (j) => {
+    document.getElementById('jm_issn_print').textContent = j.issn_print || '—';
+    document.getElementById('jm_issn_electronic').textContent = j.issn_electronic || '—';
+    document.getElementById('jm_publisher').textContent = j.publisher || '—';
+    document.getElementById('jm_country').textContent = j.country || '—';
+    document.getElementById('jm_abbrev').textContent = j.abbrev_title || '—';
+    document.getElementById('jm_lang').textContent = j.default_lang || '—';
+    const langInput = document.querySelector('input[name="language"]');
+    if (langInput && (!langInput.value || langInput.value.trim() === '')) {
+      langInput.value = j.default_lang || 'es';
+    }
+  };
+  document.getElementById('journal_id')?.addEventListener('change', async (e) => {
+    const val = e.target.value;
+    if (!val) return;
+    const res = await fetch(`{{ url_for('api_journal', jid=0) }}`.replace('0', val));
+    if (res.ok) fillJournal(await res.json());
+  });
+
+  // Precargar si ya hay revista seleccionada
+  {% if article and article.journal_id %}
+  window.addEventListener('DOMContentLoaded', async () => {
+    const res = await fetch(`{{ url_for('api_journal', jid=article.journal_id) }}`);
+    if (res.ok) fillJournal(await res.json());
+  });
+  {% endif %}
+</script>
+
+{% endblock %}

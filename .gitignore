@@ -1,0 +1,32 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Flask / instance
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# Env
+.env
+.env.*
+
+# Uploads generados por usuarios
+static/uploads/*
+!static/uploads/.gitkeep
+
+# XML exportados
+*.xml
+
+# Node
+node_modules/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

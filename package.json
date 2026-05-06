@@ -1,0 +1,21 @@
+{
+  "name": "jats-builder",
+  "version": "1.0.0",
+  "description": "Herramienta web en Flask para crear artículos y exportarlos en XML JATS.",
+  "scripts": {
+    "css:build": "npx @tailwindcss/cli -i ./static/css/styles.css -o ./static/css/tailwind.css",
+    "css:watch": "npx @tailwindcss/cli -i ./static/css/styles.css -o ./static/css/tailwind.css --watch"
+  },
+  "keywords": [
+    "jats",
+    "xml",
+    "flask",
+    "editorial"
+  ],
+  "author": "Kevin Villarreal Jiménez",
+  "license": "MIT",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.16",
+    "tailwindcss": "^4.1.16"
+  }
+}

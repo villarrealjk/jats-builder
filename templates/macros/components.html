@@ -1,0 +1,13 @@
+{# templates/macros/components.html #}
+{% macro page_header(title, back_url=None, back_text='Regresar') -%}
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">{{ title }}</h1>
+    <a href="{{ back_url or url_for('index') }}"
+       class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition flex items-center gap-1">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+      {{ back_text }}
+    </a>
+  </div>
+{%- endmacro %}
