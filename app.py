@@ -941,27 +941,27 @@ def create_app():
     
     with app.app_context():
         db.create_all()
+
         if os.getenv("INIT_ADMIN") == "true":
-            with app.app_context():
-                from models import User
-                username = os.getenv("INIT_ADMIN_USER")
-                email = os.getenv("INIT_ADMIN_EMAIL")
-                password = os.getenv("INIT_ADMIN_PASSWORD")
+            username = os.getenv("INIT_ADMIN_USER")
+            email = os.getenv("INIT_ADMIN_EMAIL")
+            password = os.getenv("INIT_ADMIN_PASSWORD")
 
-                if username and password:
-                    if not User.query.filter_by(username=username).first():
-                        user = User(
-                            username=username,
-                            email=email,
-                            is_superuser=True,
-                            is_active_user=True
-                        )
-                        user.set_password(password)
+            if username and password:
+                if not User.query.filter_by(username=username).first():
+                    user = User(
+                        username=username,
+                        email=email,
+                        is_superuser=True,
+                        is_active_user=True
+                    )
+                    user.set_password(password)
 
-                        db.session.add(user)
-                        db.session.commit()
+                    db.session.add(user)
+                    db.session.commit()
 
-                        print("✅ Superusuario creado automáticamente")
+                    print("✅ Superusuario creado automáticamente")
+
         seed()
 
     return app
