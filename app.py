@@ -124,12 +124,39 @@ def create_app():
     @app.route("/")
     @login_required
     def index():
-        if current_user.is_superuser:
-            articles = Article.query.order_by(Article.id.desc()).all()
-        else:
-            articles = Article.query.filter_by(user_id=current_user.id).order_by(Article.id.desc()).all()
+        page = request.args.get("page", 1, type=int)
+        journal_id = request.args.get("journal_id", type=int)
 
-        return render_template("index.html", articles=articles)
+        per_page = 6
+
+        query = Article.query.options(
+            selectinload(Article.titles),
+            selectinload(Article.journal)
+        )
+
+        if not current_user.is_superuser:
+            query = query.filter(Article.user_id == current_user.id)
+
+        if journal_id:
+            query = query.filter(Article.journal_id == journal_id)
+
+        pagination = query.order_by(Article.id.desc()).paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+
+        articles = pagination.items
+
+        journals = Journal.query.order_by(Journal.name.asc()).all()
+
+        return render_template(
+            "index.html",
+            articles=articles,
+            journals=journals,
+            selected_journal_id=journal_id,
+            pagination=pagination
+        )
 
     # --- Crear/editar artículo (datos front/metadata) ---
     @app.route("/article/new", methods=["GET", "POST"])
