@@ -12,7 +12,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from functools import wraps
 from uuid import uuid4
 from validators import validate_article_for_jats
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 # === Config de uploads (figuras) ===
 ALLOWED_IMG = {"png", "jpg", "jpeg", "gif", "svg", "webp"}
@@ -1189,6 +1189,50 @@ def create_app():
             latest_logs=latest_logs,
             avg_minutes_to_export=avg_minutes_to_export
         )
+
+    @app.route("/admin/migrate-db")
+    def migrate_db():
+        token = request.args.get("token")
+
+        if token != os.getenv("MIGRATION_TOKEN"):
+            abort(403)
+
+        db.session.execute(text("""
+            ALTER TABLE article
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE;
+        """))
+
+        db.session.execute(text("""
+            ALTER TABLE article
+            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE;
+        """))
+
+        db.session.execute(text("""
+            UPDATE article
+            SET created_at = NOW()
+            WHERE created_at IS NULL;
+        """))
+
+        db.session.execute(text("""
+            UPDATE article
+            SET updated_at = NOW()
+            WHERE updated_at IS NULL;
+        """))
+
+        db.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS article_log (
+                id SERIAL PRIMARY KEY,
+                article_id INTEGER NOT NULL REFERENCES article(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES "user"(id),
+                action VARCHAR(100) NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+        """))
+
+        db.session.commit()
+
+        return "Migración aplicada correctamente"
 
     return app
 
