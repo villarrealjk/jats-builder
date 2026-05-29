@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Dashboard administrativo{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Dashboard administrativo</h1>
+
+  <a href="{{ url_for('admin_users') }}"
+     class="px-4 py-2 rounded bg-gray-800 text-white">
+    Usuarios
+  </a>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white p-4 rounded-xl shadow-sm">
+    <p class="text-sm text-gray-500">Usuarios</p>
+    <p class="text-3xl font-bold">{{ total_users }}</p>
+  </div>
+
+  <div class="bg-white p-4 rounded-xl shadow-sm">
+    <p class="text-sm text-gray-500">Artículos</p>
+    <p class="text-3xl font-bold">{{ total_articles }}</p>
+  </div>
+
+  <div class="bg-white p-4 rounded-xl shadow-sm">
+    <p class="text-sm text-gray-500">Revistas</p>
+    <p class="text-3xl font-bold">{{ total_journals }}</p>
+  </div>
+
+  <div class="bg-white p-4 rounded-xl shadow-sm">
+    <p class="text-sm text-gray-500">Exportaciones XML</p>
+    <p class="text-3xl font-bold">{{ total_exports }}</p>
+  </div>
+</div>
+
+<div class="bg-white p-4 rounded-xl shadow-sm mb-6">
+  <p class="text-sm text-gray-500">Tiempo promedio creación → exportación</p>
+
+  {% if avg_minutes_to_export %}
+    <p class="text-2xl font-bold">{{ avg_minutes_to_export }} minutos</p>
+  {% else %}
+    <p class="text-gray-500">Aún no hay artículos exportados.</p>
+  {% endif %}
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+  <div class="bg-white p-4 rounded-xl shadow-sm">
+    <h2 class="text-lg font-bold mb-3">Artículos por usuario</h2>
+
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b">
+          <th class="text-left py-2">Usuario</th>
+          <th class="text-right py-2">Artículos</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for username, count in articles_by_user %}
+          <tr class="border-b">
+            <td class="py-2">{{ username }}</td>
+            <td class="py-2 text-right">{{ count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white p-4 rounded-xl shadow-sm">
+    <h2 class="text-lg font-bold mb-3">Artículos por revista</h2>
+
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b">
+          <th class="text-left py-2">Revista</th>
+          <th class="text-right py-2">Artículos</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for journal_name, count in articles_by_journal %}
+          <tr class="border-b">
+            <td class="py-2">{{ journal_name or "Sin revista" }}</td>
+            <td class="py-2 text-right">{{ count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="bg-white p-4 rounded-xl shadow-sm">
+  <h2 class="text-lg font-bold mb-3">Últimas actividades</h2>
+
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b">
+        <th class="text-left py-2">Fecha</th>
+        <th class="text-left py-2">Usuario</th>
+        <th class="text-left py-2">Artículo</th>
+        <th class="text-left py-2">Acción</th>
+        <th class="text-left py-2">Descripción</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for log in latest_logs %}
+        <tr class="border-b">
+          <td class="py-2">{{ log.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td class="py-2">
+            {% if log.user %}
+              {{ log.user.username }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td class="py-2">
+            {% if log.article %}
+              #{{ log.article.id }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td class="py-2">{{ log.action }}</td>
+          <td class="py-2">{{ log.description or "-" }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

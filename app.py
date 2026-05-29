@@ -3,7 +3,7 @@ import bleach
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash, jsonify, abort
 from flask_migrate import Migrate
-from models import db, User, Article, Author, Section, Figure, TableWrap, Reference, ReferenceAuthor, CrossRef, Journal, ArticleTitle, ArticleAbstract, ArticleKeyword
+from models import db, User, Article, ArticleLog, Author, Section, Figure, TableWrap, Reference, ReferenceAuthor, CrossRef, Journal, ArticleTitle, ArticleAbstract, ArticleKeyword
 from jats_export import build_jats_xml
 from seed_journals import seed
 from werkzeug.utils import secure_filename
@@ -12,6 +12,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from functools import wraps
 from uuid import uuid4
 from validators import validate_article_for_jats
+from sqlalchemy import func
 
 # === Config de uploads (figuras) ===
 ALLOWED_IMG = {"png", "jpg", "jpeg", "gif", "svg", "webp"}
@@ -88,6 +89,18 @@ def create_app():
             abort(403)
 
         return article
+
+    def log_article_action(article_id, action, description=None):
+        user_id = current_user.id if current_user.is_authenticated else None
+
+        log = ArticleLog(
+            article_id=article_id,
+            user_id=user_id,
+            action=action,
+            description=description
+        )
+
+        db.session.add(log)
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
@@ -198,6 +211,12 @@ def create_app():
                 for token in [k.strip() for k in raw.split(",") if k.strip()]:
                     db.session.add(ArticleKeyword(article_id=a.id, lang=lang, kwd=token))
 
+            log_article_action(
+                article_id=a.id,
+                action="created",
+                description="Artículo creado"
+            )
+
             db.session.commit()
             flash("Artículo creado con metadatos multilingües.")
             return redirect(url_for("article_edit", article_id=a.id))
@@ -283,6 +302,12 @@ def create_app():
                         kwd=token
                     ))
 
+            log_article_action(
+                article_id=a.id,
+                action="updated_metadata",
+                description="Metadatos del artículo actualizados"
+            )
+
             db.session.commit()
 
             flash("Metadatos actualizados.")
@@ -317,6 +342,12 @@ def create_app():
                 email=request.form.get("email")
             )
             db.session.add(a)
+
+            log_article_action(
+                article_id=article.id,
+                action="author_added",
+                description=f"Autor agregado: {a.given_names} {a.surname}"
+            )
             db.session.commit()
 
             flash("Autor agregado correctamente.")
@@ -337,6 +368,11 @@ def create_app():
             author.affiliation = request.form.get("affiliation")
             author.email = request.form.get("email")
 
+            log_article_action(
+                article_id=article.id,
+                action="author_updated",
+                description=f"Autor actualizado: {author.given_names} {author.surname}"
+            )
             db.session.commit()
             flash("Autor actualizado.")
             return redirect(url_for("article_edit", article_id=article.id))
@@ -349,6 +385,11 @@ def create_app():
         author = Author.query.get_or_404(author_id)
         article = get_article_or_403(author.article_id)
 
+        log_article_action(
+            article_id=article.id,
+            action="author_deleted",
+            description=f"Autor eliminado: {author.given_names} {author.surname}"
+        )
         db.session.delete(author)
         db.session.commit()
 
@@ -369,6 +410,11 @@ def create_app():
                 content_md=request.form.get("content_md") or ""
             )
             db.session.add(s)
+            log_article_action(
+                article_id=a.id,
+                action="section_added",
+                description=f"Sección agregada: {s.title}"
+            )
             db.session.commit()
 
             flash("Sección agregada.")
@@ -395,6 +441,11 @@ def create_app():
             s.slug = request.form.get("slug") or None
             s.content_md = request.form.get("content_md") or ""
 
+            log_article_action(
+                article_id=a.id,
+                action="section_updated",
+                description=f"Sección actualizada: {s.title}"
+            )
             db.session.commit()
 
             flash("Sección actualizada.")
@@ -416,6 +467,11 @@ def create_app():
         s = Section.query.get_or_404(section_id)
         a = get_article_or_403(s.article_id)
 
+        log_article_action(
+            article_id=a.id,
+            action="section_deleted",
+            description=f"Sección eliminada: {s.title}"
+        )
         db.session.delete(s)
         db.session.commit()
 
@@ -454,6 +510,11 @@ def create_app():
             )
 
             db.session.add(f)
+            log_article_action(
+                article_id=a.id,
+                action="figure_added",
+                description=f"Figura agregada: {f.label}"
+            )
             db.session.commit()
 
             flash("Figura agregada.")
@@ -490,6 +551,11 @@ def create_app():
             f.caption = request.form.get("caption")
             f.graphic_href = final_href
 
+            log_article_action(
+                article_id=a.id,
+                action="figure_updated",
+                description=f"Figura actualizada: {f.label}"
+            )
             db.session.commit()
 
             flash("Figura actualizada.")
@@ -504,6 +570,11 @@ def create_app():
         f = Figure.query.get_or_404(figure_id)
         a = get_article_or_403(f.article_id)
 
+        log_article_action(
+            article_id=a.id,
+            action="figure_deleted",
+            description=f"Figura eliminada: {f.label}"
+        )
         db.session.delete(f)
         db.session.commit()
 
@@ -533,6 +604,11 @@ def create_app():
             )
 
             db.session.add(t)
+            log_article_action(
+                article_id=a.id,
+                action="table_added",
+                description=f"Tabla agregada: {t.label}"
+            )
             db.session.commit()
 
             flash("Tabla agregada.")
@@ -559,6 +635,11 @@ def create_app():
 
             t.html_table = safe_html
 
+            log_article_action(
+                article_id=a.id,
+                action="table_updated",
+                description=f"Tabla actualizada: {t.label}"
+            )
             db.session.commit()
 
             flash("Tabla actualizada.")
@@ -573,6 +654,11 @@ def create_app():
         t = TableWrap.query.get_or_404(table_id)
         a = get_article_or_403(t.article_id)
 
+        log_article_action(
+            article_id=a.id,
+            action="table_deleted",
+            description=f"Tabla eliminada: {t.label}"
+        )
         db.session.delete(t)
         db.session.commit()
 
@@ -655,6 +741,11 @@ def create_app():
                     seq=idx,
                 ))
 
+            log_article_action(
+                article_id=a.id,
+                action="reference_added",
+                description=f"Referencia agregada: {ref.key}"
+            )
             db.session.commit()
 
             flash("Referencia agregada.")
@@ -744,6 +835,11 @@ def create_app():
                     seq=idx,
                 ))
 
+            log_article_action(
+                article_id=a.id,
+                action="reference_updated",
+                description=f"Referencia actualizada: {ref.key}"
+            )
             db.session.commit()
 
             flash("Referencia actualizada.")
@@ -764,6 +860,11 @@ def create_app():
         ref = Reference.query.get_or_404(ref_id)
         a = get_article_or_403(ref.article_id)
 
+        log_article_action(
+            article_id=a.id,
+            action="reference_deleted",
+            description=f"Referencia eliminada: {ref.key}"
+        )
         db.session.delete(ref)
         db.session.commit()
 
@@ -859,6 +960,14 @@ def create_app():
 
         with open(path, "wb") as f:
             f.write(xml_bytes)
+
+        log_article_action(
+            article_id=a.id,
+            action="exported_jats",
+            description="XML JATS exportado"
+        )
+
+        db.session.commit()
 
         return send_file(
             path,
@@ -990,6 +1099,96 @@ def create_app():
                     print("✅ Superusuario creado automáticamente")
 
         seed()
+
+    @app.route("/admin/dashboard")
+    @login_required
+    @superuser_required
+    def admin_dashboard():
+        total_users = User.query.count()
+        total_articles = Article.query.count()
+        total_journals = Journal.query.count()
+        total_exports = ArticleLog.query.filter_by(action="exported_jats").count()
+
+        articles_by_user = (
+            db.session.query(
+                User.username,
+                func.count(Article.id)
+            )
+            .outerjoin(Article, Article.user_id == User.id)
+            .group_by(User.id, User.username)
+            .order_by(func.count(Article.id).desc())
+            .all()
+        )
+
+        articles_by_journal = (
+            db.session.query(
+                Journal.name,
+                func.count(Article.id)
+            )
+            .outerjoin(Article, Article.journal_id == Journal.id)
+            .group_by(Journal.id, Journal.name)
+            .order_by(func.count(Article.id).desc())
+            .all()
+        )
+
+        latest_logs = (
+            ArticleLog.query
+            .options(
+                selectinload(ArticleLog.article),
+                selectinload(ArticleLog.user)
+            )
+            .order_by(ArticleLog.created_at.desc())
+            .limit(50)
+            .all()
+        )
+
+        exported_articles = (
+            db.session.query(Article)
+            .join(ArticleLog, ArticleLog.article_id == Article.id)
+            .filter(ArticleLog.action == "exported_jats")
+            .distinct()
+            .all()
+        )
+
+        total_minutes = 0
+        counted_articles = 0
+
+        for article in exported_articles:
+            created_log = (
+                ArticleLog.query
+                .filter_by(article_id=article.id, action="created")
+                .order_by(ArticleLog.created_at.asc())
+                .first()
+            )
+
+            export_log = (
+                ArticleLog.query
+                .filter_by(article_id=article.id, action="exported_jats")
+                .order_by(ArticleLog.created_at.asc())
+                .first()
+            )
+
+            if created_log and export_log:
+                diff = export_log.created_at - created_log.created_at
+                total_minutes += diff.total_seconds() / 60
+                counted_articles += 1
+
+        avg_minutes_to_export = None
+
+        if counted_articles > 0:
+            avg_minutes_to_export = round(total_minutes / counted_articles, 2)
+
+        return render_template(
+            "admin_dashboard.html",
+            total_users=total_users,
+            total_articles=total_articles,
+            total_journals=total_journals,
+            total_exports=total_exports,
+            articles_by_user=articles_by_user,
+            articles_by_journal=articles_by_journal,
+            latest_logs=latest_logs,
+            avg_minutes_to_export=avg_minutes_to_export
+        )
 
     return app
 

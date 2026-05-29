@@ -1,11 +1,13 @@
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timezone
 from slugify import slugify
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 
 db = SQLAlchemy()
 
+def utc_now():
+    return datetime.now(timezone.utc)
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -44,6 +46,8 @@ class Journal(db.Model):
 # --- Artículo ---
 class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utc_now)
+    updated_at = db.Column(db.DateTime(timezone=True), default=utc_now, onupdate=utc_now)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     journal_id = db.Column(db.Integer, db.ForeignKey("journal.id"), nullable=True)
     doi = db.Column(db.String(255))
@@ -67,6 +71,13 @@ class Article(db.Model):
     titles = db.relationship("ArticleTitle", backref="article", cascade="all, delete-orphan")
     abstracts = db.relationship("ArticleAbstract", backref="article", cascade="all, delete-orphan")
     keywords = db.relationship("ArticleKeyword", backref="article", cascade="all, delete-orphan")
+    
+    logs = db.relationship(
+        "ArticleLog",
+        backref="article",
+        cascade="all, delete-orphan",
+        lazy=True
+    )
 
 class ArticleTitle(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -85,6 +96,19 @@ class ArticleKeyword(db.Model):
     article_id = db.Column(db.Integer, db.ForeignKey("article.id"), nullable=False)
     lang = db.Column(db.String(8), nullable=False)
     kwd = db.Column(db.String(255), nullable=False)
+
+class ArticleLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+
+    article_id = db.Column(db.Integer, db.ForeignKey("article.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
+    action = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+
+    created_at = db.Column(db.DateTime(timezone=True), default=utc_now)
+
+    user = db.relationship("User", backref="article_logs")
 
 class Author(db.Model):
     id = db.Column(db.Integer, primary_key=True)
