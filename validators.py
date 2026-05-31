@@ -1,5 +1,85 @@
 import re
 
+def validate_cross_references(article):
+    errors = []
+    warnings = []
+
+    reference_keys = {
+        ref.key for ref in article.references
+        if ref.key
+    }
+
+    figure_labels = {
+        fig.label for fig in article.figures
+        if fig.label
+    }
+
+    table_labels = {
+        table.label for table in article.tables
+        if table.label
+    }
+
+    section_slugs = {
+        section.slug for section in article.sections
+        if section.slug
+    }
+
+    contents = []
+
+    for section in article.sections:
+        if section.content_md:
+            contents.append((section.title or f"Sección {section.id}", section.content_md))
+
+    for section_title, content in contents:
+        # Citas bibliográficas: [cite:clave]
+        cites = re.findall(r"\[cite:([^\]]+)\]", content)
+
+        for cite_key in cites:
+            cite_key = cite_key.strip()
+
+            if cite_key not in reference_keys:
+                errors.append(
+                    f"La sección '{section_title}' cita '[cite:{cite_key}]', pero no existe una referencia con esa key."
+                )
+
+        # Figuras: [xref:fig:etiqueta]
+        fig_refs = re.findall(r"\[xref:fig:([^\]]+)\]", content)
+
+        for fig_label in fig_refs:
+            fig_label = fig_label.strip()
+
+            if fig_label not in figure_labels:
+                errors.append(
+                    f"La sección '{section_title}' referencia la figura '[xref:fig:{fig_label}]', pero no existe una figura con esa etiqueta."
+                )
+
+        # Tablas: [xref:table:etiqueta]
+        table_refs = re.findall(r"\[xref:table:([^\]]+)\]", content)
+
+        for table_label in table_refs:
+            table_label = table_label.strip()
+
+            if table_label not in table_labels:
+                errors.append(
+                    f"La sección '{section_title}' referencia la tabla '[xref:table:{table_label}]', pero no existe una tabla con esa etiqueta."
+                )
+
+        # Secciones: [xref:sec:slug]
+        sec_refs = re.findall(r"\[xref:sec:([^\]]+)\]", content)
+
+        for sec_slug in sec_refs:
+            sec_slug = sec_slug.strip()
+
+            if sec_slug not in section_slugs:
+                errors.append(
+                    f"La sección '{section_title}' referencia la sección '[xref:sec:{sec_slug}]', pero no existe una sección con ese slug."
+                )
+
+    return {
+        "errors": errors,
+        "warnings": warnings,
+        "is_valid": len(errors) == 0
+    }
 
 def validate_article_for_jats(article):
     errors = []
@@ -51,6 +131,11 @@ def validate_article_for_jats(article):
     # DOI del artículo
     if article.doi and not re.match(r"^10\.\d{4,9}/[-._;()/:A-Za-z0-9]+$", article.doi):
         warnings.append(f"DOI del artículo posiblemente inválido: {article.doi}")
+
+    crossref_validation = validate_cross_references(article)
+
+    errors.extend(crossref_validation["errors"])
+    warnings.extend(crossref_validation["warnings"])
 
     return {
         "errors": errors,

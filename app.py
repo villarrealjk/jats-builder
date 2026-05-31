@@ -1,5 +1,7 @@
 import os
 import bleach
+import zipfile
+import shutil
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash, jsonify, abort
 from flask_migrate import Migrate
@@ -974,6 +976,92 @@ def create_app():
             as_attachment=True,
             download_name=f"article_{a.id}.xml",
             mimetype="application/xml"
+        )
+
+    @app.route("/article/<int:article_id>/export/package.zip")
+    @login_required
+    def export_package(article_id):
+        a = get_article_or_403(article_id)
+
+        validation = validate_article_for_jats(a)
+
+        if not validation["is_valid"]:
+            for error in validation["errors"]:
+                flash(f"Error: {error}")
+
+            for warning in validation["warnings"]:
+                flash(f"Advertencia: {warning}")
+
+            return redirect(url_for("article_edit", article_id=a.id))
+
+        # Ajustar rutas de imágenes para que apunten dentro del ZIP
+        original_hrefs = {}
+
+        for fig in a.figures:
+            if fig.graphic_href and fig.graphic_href.startswith("/static/uploads/"):
+                filename = os.path.basename(fig.graphic_href)
+                original_hrefs[fig.id] = fig.graphic_href
+                fig.graphic_href = f"images/{filename}"
+
+        xml_bytes = build_jats_xml(a)
+
+        # Restaurar rutas originales después de generar el XML
+        for fig in a.figures:
+            if fig.id in original_hrefs:
+                fig.graphic_href = original_hrefs[fig.id]
+
+        package_dir = os.path.join(app.instance_path, f"article_{a.id}_package")
+        images_dir = os.path.join(package_dir, "images")
+
+        if os.path.exists(package_dir):
+            shutil.rmtree(package_dir)
+
+        os.makedirs(images_dir, exist_ok=True)
+
+        xml_filename = f"article_{a.id}.xml"
+        xml_path = os.path.join(package_dir, xml_filename)
+
+        with open(xml_path, "wb") as f:
+            f.write(xml_bytes)
+
+        for fig in a.figures:
+            href = fig.graphic_href or ""
+
+            if href.startswith("/static/uploads/"):
+                filename = os.path.basename(href)
+                source_path = os.path.join(UPLOAD_DIR, filename)
+
+                if os.path.exists(source_path):
+                    shutil.copy2(
+                        source_path,
+                        os.path.join(images_dir, filename)
+                    )
+
+        zip_path = os.path.join(app.instance_path, f"article_{a.id}_package.zip")
+
+        if os.path.exists(zip_path):
+            os.remove(zip_path)
+
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(package_dir):
+                for file in files:
+                    full_path = os.path.join(root, file)
+                    arcname = os.path.relpath(full_path, package_dir)
+                    zipf.write(full_path, arcname)
+
+        log_article_action(
+            article_id=a.id,
+            action="exported_package",
+            description="Paquete ZIP exportado"
+        )
+
+        db.session.commit()
+
+        return send_file(
+            zip_path,
+            as_attachment=True,
+            download_name=f"article_{a.id}_package.zip",
+            mimetype="application/zip"
         )
 
     @app.cli.command("create-superuser")
