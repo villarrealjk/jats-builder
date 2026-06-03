@@ -944,14 +944,8 @@ def create_app():
 
         validation = validate_article_for_jats(a)
 
-        if not validation["is_valid"]:
-            for error in validation["errors"]:
-                flash(f"Error: {error}")
-
-            for warning in validation["warnings"]:
-                flash(f"Advertencia: {warning}")
-
-            return redirect(url_for("article_edit", article_id=a.id))
+        for error in validation["errors"]:
+            flash(f"Advertencia: {error}")
 
         for warning in validation["warnings"]:
             flash(f"Advertencia: {warning}")
@@ -985,14 +979,11 @@ def create_app():
 
         validation = validate_article_for_jats(a)
 
-        if not validation["is_valid"]:
-            for error in validation["errors"]:
-                flash(f"Error: {error}")
+        for error in validation["errors"]:
+            flash(f"Advertencia: {error}")
 
-            for warning in validation["warnings"]:
-                flash(f"Advertencia: {warning}")
-
-            return redirect(url_for("article_edit", article_id=a.id))
+        for warning in validation["warnings"]:
+            flash(f"Advertencia: {warning}")
 
         # Ajustar rutas de imágenes para que apunten dentro del ZIP
         original_hrefs = {}
