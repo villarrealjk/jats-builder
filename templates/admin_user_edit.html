@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Editar usuario{% endblock %}
+
+{% block content %}
+<div class="max-w-xl bg-white p-6 rounded-xl shadow-sm">
+  <h1 class="text-2xl font-bold mb-6">Editar usuario</h1>
+
+  <form method="POST" class="space-y-4">
+    <div>
+      <label class="block text-sm font-medium mb-1">Usuario</label>
+      <input name="username" value="{{ user.username }}" class="w-full border rounded-lg px-3 py-2" required>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-1">Email</label>
+      <input name="email" type="email" value="{{ user.email or '' }}" class="w-full border rounded-lg px-3 py-2">
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-1">Nueva contraseña</label>
+      <input name="password" type="password" class="w-full border rounded-lg px-3 py-2">
+      <p class="text-xs text-gray-500 mt-1">Déjala vacía si no deseas cambiarla.</p>
+    </div>
+
+    {% if user.id != current_user.id %}
+      <label class="flex items-center gap-2">
+        <input type="checkbox" name="is_superuser" {% if user.is_superuser %}checked{% endif %}>
+        <span>Superusuario</span>
+      </label>
+
+      <label class="flex items-center gap-2">
+        <input type="checkbox" name="is_active_user" {% if user.is_active_user %}checked{% endif %}>
+        <span>Usuario activo</span>
+      </label>
+    {% else %}
+      <div class="p-3 rounded bg-yellow-100 text-yellow-900 text-sm">
+        No puedes cambiar tu propio estado ni quitarte permisos desde aquí.
+      </div>
+    {% endif %}
+
+    <div class="flex gap-2">
+      <button class="px-4 py-2 rounded bg-blue-600 text-white">
+        Guardar cambios
+      </button>
+
+      <a href="{{ url_for('admin_users') }}"
+         class="px-4 py-2 rounded bg-gray-200">
+        Cancelar
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}

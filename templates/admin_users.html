@@ -9,6 +9,10 @@
      class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
     Nuevo usuario
   </a>
+  <a href="{{ url_for('admin_user_edit', user_id=user.id) }}"
+   class="px-3 py-1 rounded bg-blue-600 text-white">
+  Editar
+</a>
 </div>
 
 <div class="bg-white rounded-xl shadow-sm overflow-hidden">

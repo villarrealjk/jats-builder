@@ -1120,6 +1120,48 @@ def create_app():
 
         return render_template("admin_user_form.html")
 
+    @app.route("/admin/users/<int:user_id>/edit", methods=["GET", "POST"])
+    @login_required
+    @superuser_required
+    def admin_user_edit(user_id):
+        user = User.query.get_or_404(user_id)
+
+        if request.method == "POST":
+            username = request.form.get("username", "").strip()
+            email = request.form.get("email", "").strip() or None
+            password = request.form.get("password", "").strip()
+            is_superuser = request.form.get("is_superuser") == "on"
+            is_active_user = request.form.get("is_active_user") == "on"
+
+            if not username:
+                flash("El usuario es obligatorio.")
+                return redirect(url_for("admin_user_edit", user_id=user.id))
+
+            existing = User.query.filter(
+                User.username == username,
+                User.id != user.id
+            ).first()
+
+            if existing:
+                flash("Ese nombre de usuario ya está en uso.")
+                return redirect(url_for("admin_user_edit", user_id=user.id))
+
+            user.username = username
+            user.email = email
+
+            if user.id != current_user.id:
+                user.is_superuser = is_superuser
+                user.is_active_user = is_active_user
+
+            if password:
+                user.set_password(password)
+
+            db.session.commit()
+
+            flash("Usuario actualizado correctamente.")
+            return redirect(url_for("admin_users"))
+
+        return render_template("admin_user_edit.html", user=user)
 
     @app.route("/admin/users/<int:user_id>/toggle-active", methods=["POST"])
     @login_required
