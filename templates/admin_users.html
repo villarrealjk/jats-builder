@@ -9,10 +9,6 @@
      class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
     Nuevo usuario
   </a>
-  <a href="{{ url_for('admin_user_edit', user_id=user.id) }}"
-   class="px-3 py-1 rounded bg-blue-600 text-white">
-  Editar
-</a>
 </div>
 
 <div class="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -59,22 +55,29 @@
           {% endif %}
         </td>
 
-        <td class="p-3 flex gap-2">
-          {% if user.id != current_user.id %}
-            <form method="POST" action="{{ url_for('admin_user_toggle_active', user_id=user.id) }}">
-              <button class="px-3 py-1 rounded bg-yellow-500 text-white">
-                {% if user.is_active_user %}Desactivar{% else %}Activar{% endif %}
-              </button>
-            </form>
+        <td class="p-3">
+          <div class="flex gap-2">
+            <a href="{{ url_for('admin_user_edit', user_id=user.id) }}"
+               class="px-3 py-1 rounded bg-blue-600 text-white">
+              Editar
+            </a>
 
-            <form method="POST" action="{{ url_for('admin_user_toggle_superuser', user_id=user.id) }}">
-              <button class="px-3 py-1 rounded bg-purple-600 text-white">
-                {% if user.is_superuser %}Quitar admin{% else %}Hacer admin{% endif %}
-              </button>
-            </form>
-          {% else %}
-            <span class="text-gray-400">Usuario actual</span>
-          {% endif %}
+            {% if user.id != current_user.id %}
+              <form method="POST" action="{{ url_for('admin_user_toggle_active', user_id=user.id) }}">
+                <button class="px-3 py-1 rounded bg-yellow-500 text-white">
+                  {% if user.is_active_user %}Desactivar{% else %}Activar{% endif %}
+                </button>
+              </form>
+
+              <form method="POST" action="{{ url_for('admin_user_toggle_superuser', user_id=user.id) }}">
+                <button class="px-3 py-1 rounded bg-gray-800 text-white">
+                  {% if user.is_superuser %}Quitar admin{% else %}Hacer admin{% endif %}
+                </button>
+              </form>
+            {% else %}
+              <span class="text-gray-400">Usuario actual</span>
+            {% endif %}
+          </div>
         </td>
       </tr>
       {% endfor %}
