@@ -52,16 +52,61 @@ def _append_mixed_content(p_el, parts):
             p_el.append(item)
 
 def normalize_table_for_jats(table_el):
+    """
+    Normaliza una tabla HTML para que sea más compatible con JATS:
+    - mantiene <table>, <thead>, <tbody>, <tr>, <th>, <td>
+    - agrega <colgroup>
+    - agrega align="left"
+    - limpia atributos no deseados
+    - convierte textos internos correctamente
+    """
+
+    allowed_tags = {"table", "thead", "tbody", "tr", "th", "td", "colgroup", "col"}
+
+    def clean_node(node):
+        # Si hay etiquetas no permitidas dentro de celdas, conservar texto
+        for child in list(node):
+            if child.tag not in allowed_tags:
+                text = "".join(child.itertext()).strip()
+
+                if text:
+                    if node.text:
+                        node.text += " " + text
+                    else:
+                        node.text = text
+
+                node.remove(child)
+            else:
+                clean_node(child)
+
+        # Limpiar atributos no deseados
+        allowed_attrs = {"align", "colspan", "rowspan"}
+        for attr in list(node.attrib.keys()):
+            if attr not in allowed_attrs:
+                del node.attrib[attr]
+
+    clean_node(table_el)
+
+    # Agregar align="left" a th y td
     for cell in table_el.xpath(".//th|.//td"):
         if "align" not in cell.attrib:
             cell.set("align", "left")
 
+    # Crear colgroup si no existe
     if table_el.find("colgroup") is None:
         first_row = table_el.find(".//tr")
 
         if first_row is not None:
             cells = first_row.findall("./th") or first_row.findall("./td")
-            col_count = len(cells)
+            col_count = 0
+
+            for cell in cells:
+                colspan = cell.get("colspan")
+
+                if colspan and colspan.isdigit():
+                    col_count += int(colspan)
+                else:
+                    col_count += 1
 
             if col_count > 0:
                 colgroup = etree.Element("colgroup")
@@ -70,6 +115,32 @@ def normalize_table_for_jats(table_el):
                     colgroup.append(etree.Element("col"))
 
                 table_el.insert(0, colgroup)
+
+    # Si no tiene thead/tbody, intenta separar primera fila como thead
+    has_thead = table_el.find("thead") is not None
+    has_tbody = table_el.find("tbody") is not None
+
+    direct_rows = table_el.findall("tr")
+
+    if direct_rows and not has_thead and not has_tbody:
+        first_row = direct_rows[0]
+        remaining_rows = direct_rows[1:]
+
+        table_el.remove(first_row)
+
+        thead = etree.Element("thead")
+        thead.append(first_row)
+
+        tbody = etree.Element("tbody")
+
+        for row in remaining_rows:
+            table_el.remove(row)
+            tbody.append(row)
+
+        table_el.append(thead)
+
+        if len(tbody):
+            table_el.append(tbody)
 
     return table_el
 
