@@ -210,20 +210,17 @@ def _build_ref_maps(article, citation_style="numeric"):
     return ref_key_map, ref_id_map
 
 def _parse_inline_xrefs(text, article, ref_key_map=None):
-    """
-    Convierte:
-      [cite:Key]              -> <xref ref-type="bibr" rid="ref-...">cite_text</xref>
-      [xref:fig:ID]           -> <xref ref-type="fig"   rid="fig-ID">Fig...</xref>
-      [xref:table:ID]         -> <xref ref-type="table" rid="tbl-ID">Tabla...</xref>
-      [xref:sec:slug|id]      -> <xref ref-type="sec"   rid="sec-...">Título</xref>
-    """
     import re
+
     parts = []
+    targets = []
     pos = 0
+
     pattern = re.compile(r'\[(xref|cite):(fig|table|sec)?\:?(.*?)\]')
 
     for m in pattern.finditer(text or ""):
         start, end = m.span()
+
         if start > pos:
             parts.append(text[pos:start])
 
@@ -233,6 +230,7 @@ def _parse_inline_xrefs(text, article, ref_key_map=None):
 
         if kind == "cite":
             info = (ref_key_map or {}).get(payload)
+
             if info:
                 x = _el(
                     "xref",
@@ -249,10 +247,12 @@ def _parse_inline_xrefs(text, article, ref_key_map=None):
                 try:
                     fid = int(payload)
                     f = next((ff for ff in (article.figures or []) if ff.id == fid), None)
+
                     if f:
-                        label = f.label or f"Fig. {f.id}"
+                        label = f.label or f"Figura {f.id}"
                         x = _el("xref", label, ref_type="fig", rid=f"fig-{f.id}")
                         parts.append(x)
+                        targets.append(("fig", f.id))
                     else:
                         parts.append(f"[Fig {payload}]")
                 except Exception:
@@ -262,10 +262,12 @@ def _parse_inline_xrefs(text, article, ref_key_map=None):
                 try:
                     tid = int(payload)
                     t = next((tt for tt in (article.tables or []) if tt.id == tid), None)
+
                     if t:
                         label = t.label or f"Tabla {t.id}"
                         x = _el("xref", label, ref_type="table", rid=f"tbl-{t.id}")
                         parts.append(x)
+                        targets.append(("table", t.id))
                     else:
                         parts.append(f"[Tabla {payload}]")
                 except Exception:
@@ -273,16 +275,19 @@ def _parse_inline_xrefs(text, article, ref_key_map=None):
 
             elif subtype == "sec":
                 target = None
+
                 for s in (article.sections or []):
                     if str(s.id) == payload or (s.slug and s.slug == payload):
                         target = s
                         break
+
                 if target:
                     label = target.title or "Sección"
-                    # 🔹 limpiar slug para evitar sec-None
                     slug = target.slug
+
                     if not slug or str(slug).lower() == "none":
                         slug = target.id
+
                     rid = f"sec-{slug}"
                     x = _el("xref", label, ref_type="sec", rid=rid)
                     parts.append(x)
@@ -302,7 +307,48 @@ def _parse_inline_xrefs(text, article, ref_key_map=None):
         parts = [text or ""]
     elif not isinstance(parts[0], str):
         parts = [""] + parts
-    return parts
+
+    return parts, targets
+
+def build_fig_element(f):
+    fig = _el("fig", id=f"fig-{f.id}")
+
+    if f.label:
+        fig.append(_el("label", f.label))
+
+    if f.caption:
+        cap = _el("caption")
+        cap.append(_el("title", f.caption))
+        fig.append(cap)
+
+    if f.graphic_href:
+        href = os.path.basename(f.graphic_href)
+        g = _el("graphic", **({f"{{{XLINK_NS}}}href": href}))
+        fig.append(g)
+
+    return fig
+
+
+def build_table_element(t):
+    tw = _el("table-wrap", id=f"tbl-{t.id}")
+
+    if t.label:
+        tw.append(_el("label", t.label))
+
+    if t.caption:
+        cap = _el("caption")
+        cap.append(_el("title", t.caption))
+        tw.append(cap)
+
+    if t.html_table:
+        try:
+            table_el = etree.fromstring(t.html_table.encode("utf-8"))
+            table_el = normalize_table_for_jats(table_el)
+            tw.append(table_el)
+        except Exception:
+            tw.append(_el("p", t.html_table))
+
+    return tw
 
 
 def build_jats_xml(article):
@@ -467,95 +513,49 @@ def build_jats_xml(article):
     body = _el("body")
     root.append(body)
 
+    inserted_figures = set()
+    inserted_tables = set()
+
     for s in (article.sections or []):
         sec_id = f"sec-{s.slug or s.id}"
         sec_el = _el("sec", id=sec_id)
+
         if s.title:
             sec_el.append(_el("title", s.title))
 
-        p = _el("p")
-        parts = _parse_inline_xrefs(s.content_md or "", article, ref_key_map=ref_key_map)
-        _append_mixed_content(p, parts)
-        sec_el.append(p)
+        raw_content = s.content_md or ""
+        paragraphs = [p.strip() for p in raw_content.split("\n\n") if p.strip()]
 
-        xrefs = []
-        cr_qs = CrossRef.query.filter_by(article_id=article.id, source_section_id=s.id).all() if article.references else []
-        for cr in cr_qs:
-            if cr.target_type == "fig":
-                target = next((f for f in (article.figures or []) if f.id == cr.target_id), None)
-                rid = f"fig-{cr.target_id}"
-                label = cr.label_text or (target.label if target else f"Fig. {cr.target_id}")
-                x = _el("xref", label, ref_type="fig", rid=rid)
-                xrefs.append(x)
+        if not paragraphs and raw_content.strip():
+            paragraphs = [raw_content.strip()]
 
-            elif cr.target_type == "table":
-                target = next((t for t in (article.tables or []) if t.id == cr.target_id), None)
-                rid = f"tbl-{cr.target_id}"
-                label = cr.label_text or (target.label if target else f"Tabla {cr.target_id}")
-                x = _el("xref", label, ref_type="table", rid=rid)
-                xrefs.append(x)
+        for paragraph in paragraphs:
+            p = _el("p")
+            parts, targets = _parse_inline_xrefs(
+                paragraph,
+                article,
+                ref_key_map=ref_key_map
+            )
+            _append_mixed_content(p, parts)
+            sec_el.append(p)
 
-            elif cr.target_type == "sec":
-                target = next((ss for ss in (article.sections or []) if ss.id == cr.target_id), None)
-                rid = f"sec-{(target.slug or target.id) if target else cr.target_id}"
-                label = cr.label_text or (target.title if target else "Sección")
-                x = _el("xref", label, ref_type="sec", rid=rid)
-                xrefs.append(x)
+            for target_type, target_id in targets:
+                if target_type == "fig" and target_id not in inserted_figures:
+                    fig_obj = next((f for f in (article.figures or []) if f.id == target_id), None)
 
-            elif cr.target_type == "bibr":
-                info = ref_id_map.get(cr.target_id)
-                rid = info["rid"] if info else f"ref-{cr.target_id}"
-                # para IEEE usar label, para APA usar cite_text
-                label = cr.label_text or (info["label"] if CITATION_STYLE == "numeric" else info["cite_text"]) if info else f"ref-{cr.target_id}"
-                x = _el("xref", label, ref_type="bibr", rid=rid)
-                xrefs.append(x)
+                    if fig_obj:
+                        sec_el.append(build_fig_element(fig_obj))
+                        inserted_figures.add(target_id)
 
-        if xrefs:
-            p2 = _el("p")
-            parts2 = ["Véase: "]
-            for i, x in enumerate(xrefs):
-                parts2.append(x)
-                if i < len(xrefs) - 1:
-                    parts2.append("; ")
-            _append_mixed_content(p2, parts2)
-            sec_el.append(p2)
+                elif target_type == "table" and target_id not in inserted_tables:
+                    table_obj = next((t for t in (article.tables or []) if t.id == target_id), None)
+
+                    if table_obj:
+                        sec_el.append(build_table_element(table_obj))
+                        inserted_tables.add(target_id)
 
         body.append(sec_el)
 
-    # Figuras
-    for f in (article.figures or []):
-        fig = _el("fig", id=f"fig-{f.id}")
-        if f.label:
-            fig.append(_el("label", f.label))
-        if f.caption:
-            cap = _el("caption")
-            cap.append(_el("p", f.caption))
-            fig.append(cap)
-        if f.graphic_href:
-            href = os.path.basename(f.graphic_href)
-            g = _el("graphic", **({f"{{{XLINK_NS}}}href": href}))
-            fig.append(g)
-        body.append(fig)
-
-
-    # Tablas
-    for t in (article.tables or []):
-        tw = _el("table-wrap", id=f"tbl-{t.id}")
-        if t.label:
-            tw.append(_el("label", t.label))
-        if t.caption:
-            cap = _el("caption")
-            cap.append(_el("title", t.caption))
-            tw.append(cap)
-
-        if t.html_table:
-            try:
-                table_el = etree.fromstring(t.html_table.encode("utf-8"))
-                table_el = normalize_table_for_jats(table_el)
-                tw.append(table_el)
-            except Exception:
-                tw.append(_el("p", t.html_table))
-        body.append(tw)
 
     # ---------- BACK (ref-list) ----------
     if article.references:
