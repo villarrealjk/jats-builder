@@ -985,29 +985,33 @@ def create_app():
         for warning in validation["warnings"]:
             flash(f"Advertencia: {warning}")
 
-        # Ajustar rutas de imágenes para que apunten dentro del ZIP
-        original_hrefs = {}
-
-        for fig in a.figures:
-            if fig.graphic_href and fig.graphic_href.startswith("/static/uploads/"):
-                filename = os.path.basename(fig.graphic_href)
-                original_hrefs[fig.id] = fig.graphic_href
-                fig.graphic_href = f"images/{filename}"
-
-        xml_bytes = build_jats_xml(a)
-
-        # Restaurar rutas originales después de generar el XML
-        for fig in a.figures:
-            if fig.id in original_hrefs:
-                fig.graphic_href = original_hrefs[fig.id]
-
         package_dir = os.path.join(app.instance_path, f"article_{a.id}_package")
-        images_dir = os.path.join(package_dir, "images")
 
         if os.path.exists(package_dir):
             shutil.rmtree(package_dir)
 
-        os.makedirs(images_dir, exist_ok=True)
+        os.makedirs(package_dir, exist_ok=True)
+
+        original_hrefs = {}
+        export_names = {}
+
+        for idx, fig in enumerate(a.figures, start=1):
+            if fig.graphic_href and fig.graphic_href.startswith("/static/uploads/"):
+                original_name = os.path.basename(fig.graphic_href)
+                ext = original_name.rsplit(".", 1)[-1].lower()
+
+                export_name = f"article_{a.id}_gf{idx}.{ext}"
+
+                original_hrefs[fig.id] = fig.graphic_href
+                export_names[fig.id] = export_name
+
+                fig.graphic_href = export_name
+
+        xml_bytes = build_jats_xml(a)
+
+        for fig in a.figures:
+            if fig.id in original_hrefs:
+                fig.graphic_href = original_hrefs[fig.id]
 
         xml_filename = f"article_{a.id}.xml"
         xml_path = os.path.join(package_dir, xml_filename)
@@ -1021,11 +1025,12 @@ def create_app():
             if href.startswith("/static/uploads/"):
                 filename = os.path.basename(href)
                 source_path = os.path.join(UPLOAD_DIR, filename)
+                export_name = export_names.get(fig.id, filename)
 
                 if os.path.exists(source_path):
                     shutil.copy2(
                         source_path,
-                        os.path.join(images_dir, filename)
+                        os.path.join(package_dir, export_name)
                     )
 
         zip_path = os.path.join(app.instance_path, f"article_{a.id}_package.zip")
@@ -1054,7 +1059,6 @@ def create_app():
             download_name=f"article_{a.id}_package.zip",
             mimetype="application/zip"
         )
-
     @app.cli.command("create-superuser")
     def create_superuser():
         username = input("Usuario: ").strip()
