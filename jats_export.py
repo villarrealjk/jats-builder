@@ -51,6 +51,28 @@ def _append_mixed_content(p_el, parts):
         else:
             p_el.append(item)
 
+def normalize_table_for_jats(table_el):
+    for cell in table_el.xpath(".//th|.//td"):
+        if "align" not in cell.attrib:
+            cell.set("align", "left")
+
+    if table_el.find("colgroup") is None:
+        first_row = table_el.find(".//tr")
+
+        if first_row is not None:
+            cells = first_row.findall("./th") or first_row.findall("./td")
+            col_count = len(cells)
+
+            if col_count > 0:
+                colgroup = etree.Element("colgroup")
+
+                for _ in range(col_count):
+                    colgroup.append(etree.Element("col"))
+
+                table_el.insert(0, colgroup)
+
+    return table_el
+
 def _build_ref_maps(article, citation_style="numeric"):
     """
     Devuelve:
@@ -439,11 +461,8 @@ def build_jats_xml(article):
             cap.append(_el("p", f.caption))
             fig.append(cap)
         if f.graphic_href:
-            # 🔹 Solo el nombre del archivo, sin la ruta
-            href = os.path.basename(f.graphic_href)
+            href = f.graphic_href
             g = _el("graphic", **({f"{{{XLINK_NS}}}href": href}))
-            # Puedes omitir el atributo 'href' simple si quieres que quede igual al XML ejemplo
-            # g.set("href", href)
             fig.append(g)
         body.append(fig)
 
@@ -455,11 +474,13 @@ def build_jats_xml(article):
             tw.append(_el("label", t.label))
         if t.caption:
             cap = _el("caption")
-            cap.append(_el("p", t.caption))
+            cap.append(_el("title", t.caption))
             tw.append(cap)
+
         if t.html_table:
             try:
                 table_el = etree.fromstring(t.html_table.encode("utf-8"))
+                table_el = normalize_table_for_jats(table_el)
                 tw.append(table_el)
             except Exception:
                 tw.append(_el("p", t.html_table))
