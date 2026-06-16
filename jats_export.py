@@ -532,7 +532,7 @@ def build_jats_xml(article):
             cap.append(_el("p", f.caption))
             fig.append(cap)
         if f.graphic_href:
-            href = f.graphic_href
+            href = os.path.basename(f.graphic_href)
             g = _el("graphic", **({f"{{{XLINK_NS}}}href": href}))
             fig.append(g)
         body.append(fig)
