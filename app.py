@@ -187,6 +187,7 @@ def create_app():
                 fpage = request.form.get("fpage") or None,
                 lpage = request.form.get("lpage") or None,
                 elocation_id = request.form.get("elocation_id") or None,
+                citation_style=request.form.get("citation_style") or "apa",
             )
             db.session.add(a)
             db.session.flush()  # tenemos a.id
@@ -255,6 +256,7 @@ def create_app():
             a.fpage = request.form.get("fpage") or None
             a.lpage = request.form.get("lpage") or None
             a.elocation_id = request.form.get("elocation_id") or None
+            a.citation_style = request.form.get("citation_style") or "apa"
 
             # Limpiar títulos anteriores
             a.titles.clear()

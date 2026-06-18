@@ -53,6 +53,7 @@ class Article(db.Model):
     doi = db.Column(db.String(255))
     language = db.Column(db.String(16), default="es")  # idioma principal
     pub_date = db.Column(db.Date, default=datetime.utcnow)
+    citation_style = db.Column(db.String(20), default="apa")
 
     # Paginación / localización
     fpage = db.Column(db.String(32))         # página inicial (impreso)

@@ -10,7 +10,7 @@ XML_NS = "http://www.w3.org/XML/1998/namespace"
 XLINK_NS = "http://www.w3.org/1999/xlink"
 
 # Estilo global de citas: "numeric" (IEEE/Vancouver) o "apa" (autor-año)
-CITATION_STYLE = "apa"  # cambia a "apa" cuando lo necesites
+DEFAULT_CITATION_STYLE = "apa"
 
 def _el(name, text=None, **attrs):
     """
@@ -507,7 +507,8 @@ def build_jats_xml(article):
     front.append(am)
 
     # ---------- MAPAS DE REFERENCIAS ----------
-    ref_key_map, ref_id_map = _build_ref_maps(article, citation_style=CITATION_STYLE)
+    citation_style = getattr(article, "citation_style", None) or DEFAULT_CITATION_STYLE
+    ref_key_map, ref_id_map = _build_ref_maps(article, citation_style=citation_style)
 
     # ---------- BODY ----------
     body = _el("body")
@@ -571,7 +572,7 @@ def build_jats_xml(article):
             ref_el = _el("ref", id=rid)
 
             # label: para numérico se mantiene [n]; para APA podrías omitirlo si quieres.
-            if CITATION_STYLE == "numeric":
+            if citation_style == "numeric":
                 lab_el = _el("label", label_text or "")
                 ref_el.append(lab_el)
             else:
@@ -583,7 +584,7 @@ def build_jats_xml(article):
 
             # mixed-citation
             mc_text = (r.mixed_citation or "").strip()
-            if CITATION_STYLE == "numeric":
+            if citation_style == "numeric":
                 # prefija el número si no está
                 if label_text and not mc_text.lstrip().startswith(label_text):
                     mc_text = f"{label_text} {mc_text}".strip()
