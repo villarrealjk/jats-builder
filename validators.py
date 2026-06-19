@@ -142,3 +142,44 @@ def validate_article_for_jats(article):
         "warnings": warnings,
         "is_valid": len(errors) == 0
     }
+
+
+def validate_article_completion(article):
+    errors = []
+    warnings = []
+
+    if not article.titles:
+        errors.append("El artículo debe tener al menos un título.")
+
+    if not article.abstracts:
+        errors.append("El artículo debe tener al menos un resumen.")
+
+    if not article.authors:
+        errors.append("El artículo debe tener al menos un autor.")
+
+    if not article.sections:
+        errors.append("El artículo debe tener al menos una sección.")
+
+    if not article.references:
+        errors.append("El artículo debe tener al menos una referencia bibliográfica.")
+
+    if not article.journal:
+        warnings.append("El artículo no tiene revista asociada.")
+
+    if not article.doi:
+        warnings.append("El artículo no tiene DOI.")
+
+    if not article.keywords:
+        warnings.append("El artículo no tiene palabras clave.")
+
+    if not article.figures:
+        warnings.append("El artículo no tiene figuras.")
+
+    if not article.tables:
+        warnings.append("El artículo no tiene tablas.")
+
+    return {
+        "errors": errors,
+        "warnings": warnings,
+        "is_valid": len(errors) == 0
+    }

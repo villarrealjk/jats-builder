@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from functools import wraps
 from uuid import uuid4
-from validators import validate_article_for_jats
+from validators import validate_article_for_jats, validate_article_completion
 from sqlalchemy import func, text
 
 # === Config de uploads (figuras) ===
@@ -319,6 +319,45 @@ def create_app():
 
         return render_template("article_form.html", article=a, journals=journals)
 
+
+    @app.route("/article/<int:article_id>/mark-completed", methods=["POST"])
+    @login_required
+    def article_mark_completed(article_id):
+        a = get_article_or_403(article_id)
+
+        validation = validate_article_completion(a)
+
+        if not validation["is_valid"]:
+            for error in validation["errors"]:
+                flash(f"No se puede finalizar: {error}")
+
+            for warning in validation["warnings"]:
+                flash(f"Advertencia: {warning}")
+
+            return redirect(url_for("article_edit", article_id=a.id))
+
+        already_completed = ArticleLog.query.filter_by(
+            article_id=a.id,
+            action="completed"
+        ).first()
+
+        if already_completed:
+            flash("Este artículo ya estaba marcado como finalizado.")
+            return redirect(url_for("article_edit", article_id=a.id))
+
+        for warning in validation["warnings"]:
+            flash(f"Advertencia: {warning}")
+
+        log_article_action(
+            article_id=a.id,
+            action="completed",
+            description="Artículo marcado como finalizado"
+        )
+
+        db.session.commit()
+
+        flash("Artículo marcado como finalizado.")
+        return redirect(url_for("article_edit", article_id=a.id))
 
     # --- API para precargar datos de revista ---
     @app.route("/api/journals/<int:jid>")
@@ -1305,6 +1344,48 @@ def create_app():
         if counted_articles > 0:
             avg_minutes_to_export = round(total_minutes / counted_articles, 2)
 
+        total_completed = ArticleLog.query.filter_by(action="completed").count()
+
+        completed_articles = (
+            db.session.query(Article)
+            .join(ArticleLog, ArticleLog.article_id == Article.id)
+            .filter(ArticleLog.action == "completed")
+            .distinct()
+            .all()
+        )
+
+        completed_times = []
+
+        for article in completed_articles:
+            created_log = (
+                ArticleLog.query
+                .filter_by(article_id=article.id, action="created")
+                .order_by(ArticleLog.created_at.asc())
+                .first()
+            )
+
+            completed_log = (
+                ArticleLog.query
+                .filter_by(article_id=article.id, action="completed")
+                .order_by(ArticleLog.created_at.asc())
+                .first()
+            )
+
+            if created_log and completed_log:
+                diff = completed_log.created_at - created_log.created_at
+                completed_times.append({
+                    "article": article,
+                    "minutes": round(diff.total_seconds() / 60, 2)
+                })
+
+        avg_minutes_to_complete = None
+
+        if completed_times:
+            avg_minutes_to_complete = round(
+                sum(item["minutes"] for item in completed_times) / len(completed_times),
+                2
+            )
+        
         return render_template(
             "admin_dashboard.html",
             total_users=total_users,
@@ -1314,7 +1395,10 @@ def create_app():
             articles_by_user=articles_by_user,
             articles_by_journal=articles_by_journal,
             latest_logs=latest_logs,
-            avg_minutes_to_export=avg_minutes_to_export
+            avg_minutes_to_export=avg_minutes_to_export,
+            total_completed=total_completed,
+            completed_times=completed_times,
+            avg_minutes_to_complete=avg_minutes_to_complete
         )
 
     return app

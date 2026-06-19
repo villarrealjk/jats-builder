@@ -28,9 +28,24 @@
   </div>
 
   <div class="bg-white p-4 rounded-xl shadow-sm">
+    <p class="text-sm text-gray-500">Artículos finalizados</p>
+    <p class="text-3xl font-bold">{{ total_completed }}</p>
+  </div>
+
+  <div class="bg-white p-4 rounded-xl shadow-sm">
     <p class="text-sm text-gray-500">Exportaciones XML</p>
     <p class="text-3xl font-bold">{{ total_exports }}</p>
   </div>
+</div>
+
+<div class="bg-white p-4 rounded-xl shadow-sm mb-6">
+  <p class="text-sm text-gray-500">Tiempo promedio creación → finalización</p>
+
+  {% if avg_minutes_to_complete %}
+    <p class="text-2xl font-bold">{{ avg_minutes_to_complete }} minutos</p>
+  {% else %}
+    <p class="text-gray-500">Aún no hay artículos finalizados.</p>
+  {% endif %}
 </div>
 
 <div class="bg-white p-4 rounded-xl shadow-sm mb-6">
@@ -85,6 +100,33 @@
       </tbody>
     </table>
   </div>
+</div>
+
+<div class="bg-white p-4 rounded-xl shadow-sm mb-6">
+  <h2 class="text-lg font-bold mb-3">Tiempo empleado por artículo finalizado</h2>
+
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b">
+        <th class="text-left py-2">Artículo</th>
+        <th class="text-right py-2">Tiempo</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in completed_times %}
+        <tr class="border-b">
+          <td class="py-2">#{{ item.article.id }}</td>
+          <td class="py-2 text-right">{{ item.minutes }} minutos</td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="2" class="py-3 text-gray-500">
+            No hay artículos finalizados todavía.
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 
 <div class="bg-white p-4 rounded-xl shadow-sm">
