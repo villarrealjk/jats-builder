@@ -391,12 +391,13 @@
   </a>
 
   <form method="POST"
-        action="{{ url_for('article_mark_completed', article_id=article.id) }}"
-        onsubmit="return confirm('Se validará que el artículo tenga título, resumen, autores, secciones y referencias. ¿Deseas continuar?');"
-        class="inline">
-    <button class="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700">
-      ✓ Marcar como finalizado
-    </button>
+      action="{{ url_for('article_mark_completed', article_id=article.id) }}"
+      onsubmit="return confirm('Se validará que el artículo tenga título, resumen, autores, secciones y referencias. ¿Deseas continuar?');">
+      <input
+        type="submit"
+        value="✓ Marcar como finalizado"
+        class="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 cursor-pointer font-medium"
+      >
   </form>
 
 </div>
