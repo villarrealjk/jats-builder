@@ -35,18 +35,30 @@
     <aside class="bg-white p-4 rounded-xl shadow-sm">
       <div class="text-lg font-semibold mb-3">Asistente de referencias cruzadas</div>
 
-            <!-- Referencias bibliográficas -->
+      <!-- Referencias bibliográficas -->
       <div class="mb-5">
         <div class="text-sm font-medium mb-1">Citar bibliografía</div>
 
-        <select id="sel_ref" class="w-full rounded-lg border px-3 py-2">
-          <option value="">— Selecciona referencia —</option>
+        <input
+          id="sel_ref"
+          list="ref_options"
+          class="w-full rounded-lg border px-3 py-2"
+          placeholder="Buscar por key, autor, año, DOI o título..."
+          autocomplete="off"
+        >
+
+        <datalist id="ref_options">
           {% for r in article.references %}
-            <option value="{{ r.key or ('ref-' ~ r.id) }}">
-              {{ r.key or ('ref-' ~ r.id) }} — {{ (r.mixed_citation or '')[:90] }}
+            <option
+              data-key="{{ r.key or ('ref-' ~ r.id) }}"
+              value="{{ r.key or ('ref-' ~ r.id) }} — {{ r.year or '' }} — {{ r.article_title or '' }} — {{ r.doi or '' }} — {{ (r.mixed_citation or '')[:120] }}">
             </option>
           {% endfor %}
-        </select>
+        </datalist>
+
+        <p class="text-xs text-gray-500 mt-1">
+          Escribe para buscar y selecciona una referencia de la lista.
+        </p>
 
         <button
           type="button"
@@ -118,9 +130,31 @@
     const ta = document.getElementById('content_md');
 
     document.getElementById('btn_insert_cite')?.addEventListener('click', () => {
-      const key = document.getElementById('sel_ref').value.trim();
+      const refInput = document.getElementById('sel_ref');
+      const value = refInput.value.trim();
+
+      if (!value) return;
+
+      let key = "";
+
+      document.querySelectorAll("#ref_options option").forEach(option => {
+        if (option.value === value) {
+          key = option.dataset.key;
+        }
+      });
+
+      // Si el usuario escribió directamente una key válida
+      if (!key && value.includes("—")) {
+        key = value.split("—")[0].trim();
+      } else if (!key) {
+        key = value.trim();
+      }
+
       if (!key) return;
+
       insertAtCursor(ta, ` [cite:${key}] `);
+
+      refInput.value = "";
     });
 
     document.getElementById('btn_insert_fig')?.addEventListener('click', () => {
